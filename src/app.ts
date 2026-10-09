@@ -5,8 +5,7 @@ import Fastify from "fastify";
 import "dotenv/config";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
-import { request } from "node:http";
-import { timeStamp } from "node:console";
+import productRoutes from "./routes/products.routes";
 
 const PORT = parseInt(process.env.PORT ?? "3000");
 
@@ -22,6 +21,8 @@ fastify.register(cors, {
 fastify.register(helmet, {
   contentSecurityPolicy: false,
 });
+
+fastify.register(productRoutes, {prefix: "/products"});
 
 // Declare a route
 fastify.get("/", async (request, reply) => {
