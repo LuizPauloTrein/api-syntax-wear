@@ -1,15 +1,16 @@
 // Require the framework and instantiate it
 
 // ESM
-import Fastify from "fastify";
+import Fastify, { FastifyError } from "fastify";
 import "dotenv/config";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import productRoutes from "./routes/products.routes.js";
 import swagger from "@fastify/swagger";
 import scalar from "@scalar/fastify-api-reference";
-import jwt from "@fastify/jwt"
+import jwt from "@fastify/jwt";
 import authRoutes from "./routes/auth.routes.js";
+import { errorHandler } from "./middlewares/error.middleware.js";
 
 const PORT = parseInt(process.env.PORT ?? "3000");
 
@@ -18,8 +19,8 @@ const fastify = Fastify({
 });
 
 fastify.register(jwt, {
-  secret: process.env.JWT_SECRET!
-})
+  secret: process.env.JWT_SECRET!,
+});
 
 fastify.register(cors, {
   origin: true,
@@ -60,9 +61,9 @@ fastify.register(swagger, {
 fastify.register(scalar, {
   routePrefix: "/api-docs",
   configuration: {
-    theme: "default"
-  }
-})
+    theme: "default",
+  },
+});
 
 fastify.register(productRoutes, { prefix: "/products" });
 
@@ -83,6 +84,8 @@ fastify.get("/health", async (request, reply) => {
     timeStamp: new Date().toISOString(),
   };
 });
+
+fastify.setErrorHandler(errorHandler);
 
 // Run the server!
 fastify.listen({ port: PORT }, function (err, address) {

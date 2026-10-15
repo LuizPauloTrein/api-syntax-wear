@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { login, register } from "../controllers/auth.controller.js";
-import { AuthRequest } from "../types/index.js";
+import { AuthRequest, RegisterRequest } from "../types/index.js";
 
 export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: AuthRequest }>(
@@ -15,7 +15,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
           properties: {
             email: {
               type: "string",
-              format: "email",
               description: "Email do usuario",
             },
             password: {
@@ -29,7 +28,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     login,
   );
 
-  fastify.post(
+  fastify.post<{ Body: RegisterRequest }>(
     "/register",
     {
       schema: {
@@ -49,7 +48,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
             },
             email: {
               type: "string",
-              format: "email",
               description: "Email do usuario",
             },
             password: {
@@ -62,7 +60,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
             },
             dateBirth: {
               type: "string",
-              format: "date",
               description: "Data de nascimento no formato YYYY-MM-DD",
             },
             phone: {

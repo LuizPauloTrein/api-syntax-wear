@@ -19,5 +19,4 @@ export interface RegisterRequest extends AuthRequest {
   cpf?: string;
   dateBirth?: string;
   phone?: string;
-  role: "USER" | "ADMIN";
 }
