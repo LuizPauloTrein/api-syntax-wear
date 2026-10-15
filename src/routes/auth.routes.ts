@@ -1,9 +1,36 @@
 import { FastifyInstance } from "fastify";
-import { register } from "../controllers/auth.controller.js";
+import { login, register } from "../controllers/auth.controller.js";
+import { AuthRequest } from "../types/index.js";
 
 export default async function authRoutes(fastify: FastifyInstance) {
+  fastify.post<{ Body: AuthRequest }>(
+    "/login",
+    {
+      schema: {
+        tags: ["Auth"],
+        description: "Autentica um usuario e retorna um token JWT",
+        body: {
+          type: "object",
+          required: ["email", "password"],
+          properties: {
+            email: {
+              type: "string",
+              format: "email",
+              description: "Email do usuario",
+            },
+            password: {
+              type: "string",
+              description: "Senha do usuario",
+            },
+          },
+        },
+      },
+    },
+    login,
+  );
+
   fastify.post(
-    "/",
+    "/register",
     {
       schema: {
         tags: ["Auth"],
