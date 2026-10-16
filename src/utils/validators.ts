@@ -1,4 +1,4 @@
-import z from "zod";
+import z, { optional } from "zod";
 
 export const loginSchema = z.object({
   email: z.email("Email inválido"),
@@ -17,10 +17,24 @@ export const registerSchema = z.object({
 
 export const productFiltersSchema = z
   .object({
-    page: z.coerce.number().int().positive("Página deve ser um inteiro positivo").optional(),
-    limit: z.coerce.number().int().positive("Limite deve ser um inteiro positivo").optional(),
-    minPrice: z.coerce.number().nonnegative("Preço mínimo não pode ser negativo").optional(),
-    maxPrice: z.coerce.number().nonnegative("Preço máximo não pode ser negativo").optional(),
+    page: z.coerce
+      .number()
+      .int()
+      .positive("Página deve ser um inteiro positivo")
+      .optional(),
+    limit: z.coerce
+      .number()
+      .int()
+      .positive("Limite deve ser um inteiro positivo")
+      .optional(),
+    minPrice: z.coerce
+      .number()
+      .nonnegative("Preço mínimo não pode ser negativo")
+      .optional(),
+    maxPrice: z.coerce
+      .number()
+      .nonnegative("Preço máximo não pode ser negativo")
+      .optional(),
     search: z.string().optional(),
     sortBy: z.enum(["price", "name", "createdAt"]).optional(),
     sortOrder: z.enum(["asc", "desc"]).optional(),
@@ -33,3 +47,15 @@ export const productFiltersSchema = z
       path: ["maxPrice"],
     },
   );
+
+export const createProductSchema = z.object({
+  name: z.string().min(1, "Nome é obrigatório"),
+  description: z.string().min(1, "Descricão é obrigatória"),
+  price: z.number().nonnegative("Preco deve ser positivo"),
+  colors: z.array(z.string()).optional(),
+  sizes: z.array(z.string()).optional(),
+  slug: z.string().min(1, "Slug é obrigatório"),
+  stock: z.number().int().nonnegative("Estoque deve ser positivo"),
+  active: z.boolean(),
+  imgaes: z.array(z.string()).optional()
+});

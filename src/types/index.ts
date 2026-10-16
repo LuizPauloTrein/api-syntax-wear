@@ -20,3 +20,15 @@ export interface RegisterRequest extends AuthRequest {
   dateBirth?: string;
   phone?: string;
 }
+
+export interface CreateProduct {
+  name: string;
+  description: string;
+  price: number;
+  colors?: string[];
+  sizes?: string[];
+  slug: string;
+  stock: number;
+  active: boolean;
+  imgaes?: string[];
+}
