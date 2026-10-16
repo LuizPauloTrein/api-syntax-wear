@@ -41,7 +41,7 @@ fastify.register(swagger, {
     },
     servers: [
       {
-        url: `https://localhost:${PORT}`,
+        url: `http://localhost:${PORT}`,
         description: "Servidor de desenvolvimento",
       },
     ],
