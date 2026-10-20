@@ -5,14 +5,15 @@ import {
   getProductById,
   createProduct,
   updateProduct,
+  deleteProduct,
 } from "../services/products.service.js";
 import {
   createProductSchema,
+  deleteProductSchema,
   productFiltersSchema,
   updateProductSchema,
 } from "../utils/validators.js";
 import slugify from "slugify";
-import { request } from "node:http";
 
 export const listProducts = async (
   request: FastifyRequest<{ Querystring: ProductFilters }>,
@@ -71,4 +72,15 @@ export const updateExistingProduct = async (
 
   const product = await updateProduct(Number(id), validate);
   reply.status(200).send(product);
+};
+
+export const deleteExistingProduct = async (
+  request: FastifyRequest<{ Params: { id: number } }>,
+  reply: FastifyReply,
+) => {
+  const { id } = request.params;
+
+  const validate = deleteProductSchema.parse({id})
+
+  await deleteProduct(validate.id);
 };

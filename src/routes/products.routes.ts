@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import {
   createNewProduct,
+  deleteExistingProduct,
   getProduct,
   listProducts,
   updateExistingProduct,
@@ -154,12 +155,11 @@ export default async function productRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ["Products"],
-        description: "Atualizar produto",
-        security: [{ bearerAuth: [] }],
+        description: "Atualizar produto pelo ID",
         params: {
           type: "object",
           properties: {
-            id: { type: "string", description: "ID do produto" },
+            id: { type: "number", description: "ID do produto" },
           },
           required: ["id"],
         },
@@ -188,42 +188,55 @@ export default async function productRoutes(fastify: FastifyInstance) {
         response: {
           200: {
             description: "Produto atualizado",
-            type: "object",
-            properties: {
-              id: { type: "string" },
-              name: { type: "string" },
-              description: { type: "string", nullable: true },
-              price: { type: "number" },
-              color: { type: "string", nullable: true },
-              stock: { type: "integer" },
-              tags: { type: "array", items: { type: "string" } },
-            },
+            ...productResponseSchema,
           },
           400: {
-            description: "Erro de validação",
-            type: "object",
-            properties: {
-              error: { type: "string" },
-              details: { type: "array", nullable: true },
-            },
+            description: "Requisicao invalida",
+            ...errorResponseSchema,
           },
           404: {
             description: "Produto não encontrado",
-            type: "object",
-            properties: {
-              error: { type: "string" },
-            },
+            ...errorResponseSchema,
           },
           401: {
             description: "Não autenticado",
-            type: "object",
-            properties: {
-              error: { type: "string" },
-            },
+            ...errorResponseSchema,
           },
         },
       },
     },
     updateExistingProduct,
+  );
+
+  fastify.delete(
+    "/:id",
+    {
+      schema: {
+        tags: ["Products"],
+        description: "Excluir produto pelo ID",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            id: { type: "number", description: "ID do produto" },
+          },
+          required: ["id"],
+        },
+        response: {
+          200: {
+            description: "Produto excluído",
+          },
+          401: {
+            description: "Não autenticado",
+            ...errorResponseSchema,
+          },
+          404: {
+            description: "Produto não encontrado",
+            ...errorResponseSchema,
+          },
+        },
+      },
+    },
+    deleteExistingProduct,
   );
 }

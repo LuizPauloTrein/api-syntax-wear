@@ -33,7 +33,7 @@ export interface CreateProduct {
   imgaes?: string[];
 }
 
-export interface UpdateProduct extends Partial<CreateProduct>{
+export interface UpdateProduct extends Partial<CreateProduct> {
   name?: string;
   description?: string;
   price?: number;
