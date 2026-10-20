@@ -1,6 +1,10 @@
 import { prisma } from "../utils/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
-import { CreateProduct, ProductFilters } from "../types/index.js";
+import {
+  CreateProduct,
+  ProductFilters,
+  UpdateProduct,
+} from "../types/index.js";
 
 export const getProducts = async (filter: ProductFilters) => {
   const {
@@ -57,10 +61,37 @@ export const createProduct = async (data: CreateProduct) => {
     where: { slug: data.slug },
   });
 
-  if(existingProduct){
-    throw new Error("Slug ja existe, escolha outro nome para o produto")
+  if (existingProduct) {
+    throw new Error("Slug ja existe, escolha outro nome para o produto");
   }
 
   const newProduct = await prisma.product.create({ data });
   return newProduct;
+};
+
+export const updateProduct = async (id: number, data: UpdateProduct) => {
+  const existingProduct = await prisma.product.findUnique({
+    where: { id },
+  });
+
+  if (!existingProduct) {
+    throw new Error("Produto nao encontrado");
+  }
+
+  if (data.slug) {
+    const slugExists = await prisma.product.findUnique({
+      where: { slug: data.slug },
+    });
+
+    if (slugExists && slugExists.id !== id) {
+      throw new Error("Slug ja existe, escolha outro nome para o produto");
+    }
+  }
+
+  const updatedProduct = await prisma.product.update({
+    where: { id },
+    data,
+  });
+
+  return updatedProduct;
 };

@@ -3,6 +3,7 @@ import {
   createNewProduct,
   getProduct,
   listProducts,
+  updateExistingProduct,
 } from "../controllers/product.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 
@@ -146,5 +147,83 @@ export default async function productRoutes(fastify: FastifyInstance) {
       },
     },
     createNewProduct,
+  );
+
+  fastify.put(
+    "/:id",
+    {
+      schema: {
+        tags: ["Products"],
+        description: "Atualizar produto",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "ID do produto" },
+          },
+          required: ["id"],
+        },
+        body: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            description: { type: "string" },
+            price: { type: "number" },
+            active: { type: "boolean" },
+            stock: { type: "number" },
+            colors: {
+              type: "array",
+              items: { type: "string" },
+            },
+            images: {
+              type: "array",
+              items: { type: "string" },
+            },
+            sizes: {
+              type: "array",
+              items: { type: "string" },
+            },
+          },
+        },
+        response: {
+          200: {
+            description: "Produto atualizado",
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              description: { type: "string", nullable: true },
+              price: { type: "number" },
+              color: { type: "string", nullable: true },
+              stock: { type: "integer" },
+              tags: { type: "array", items: { type: "string" } },
+            },
+          },
+          400: {
+            description: "Erro de validação",
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              details: { type: "array", nullable: true },
+            },
+          },
+          404: {
+            description: "Produto não encontrado",
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+          },
+          401: {
+            description: "Não autenticado",
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    updateExistingProduct,
   );
 }
