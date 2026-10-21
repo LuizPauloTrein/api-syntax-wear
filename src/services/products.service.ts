@@ -56,6 +56,13 @@ export const getProductById = async (id: number) => {
   return product;
 };
 
+export class ProductCategoryNotFoundError extends Error {
+  constructor() {
+    super("Categoria não encontrada");
+    this.name = "ProductCategoryNotFoundError";
+  }
+}
+
 export const createProduct = async (data: CreateProduct) => {
   const existingProduct = await prisma.product.findUnique({
     where: { slug: data.slug },
@@ -63,6 +70,14 @@ export const createProduct = async (data: CreateProduct) => {
 
   if (existingProduct) {
     throw new Error("Slug ja existe, escolha outro nome para o produto");
+  }
+
+  const existingCategory = await prisma.category.findUnique({
+    where: { id: data.categoryId },
+  });
+
+  if (!existingCategory) {
+    throw new ProductCategoryNotFoundError();
   }
 
   const newProduct = await prisma.product.create({ data });
@@ -78,6 +93,16 @@ export const updateProduct = async (id: number, data: UpdateProduct) => {
     throw new Error("Produto nao encontrado");
   }
 
+  if (data.categoryId !== undefined) {
+    const existingCategory = await prisma.category.findUnique({
+      where: { id: data.categoryId },
+    });
+
+    if (!existingCategory) {
+      throw new ProductCategoryNotFoundError();
+    }
+  }
+
   if (data.slug) {
     const slugExists = await prisma.product.findUnique({
       where: { slug: data.slug },
@@ -91,6 +116,7 @@ export const updateProduct = async (id: number, data: UpdateProduct) => {
   const updatedProduct = await prisma.product.update({
     where: { id },
     data,
+    include: { category: true },
   });
 
   return updatedProduct;

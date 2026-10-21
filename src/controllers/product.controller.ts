@@ -6,6 +6,7 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  ProductCategoryNotFoundError,
 } from "../services/products.service.js";
 import {
   createProductSchema,
@@ -45,7 +46,17 @@ export const createNewProduct = async (
   });
 
   const validate = createProductSchema.parse(body);
-  await createProduct(validate);
+
+  try {
+    await createProduct(validate);
+  } catch (error) {
+    if (error instanceof ProductCategoryNotFoundError) {
+      reply.status(400).send({ message: error.message });
+      return;
+    }
+
+    throw error;
+  }
 
   reply.status(201).send({ message: "Produto criado com sucesso" });
 };
@@ -70,8 +81,17 @@ export const updateExistingProduct = async (
     });
   }
 
-  const product = await updateProduct(Number(id), validate);
-  reply.status(200).send(product);
+  try {
+    const product = await updateProduct(Number(id), validate);
+    reply.status(200).send(product);
+  } catch (error) {
+    if (error instanceof ProductCategoryNotFoundError) {
+      reply.status(400).send({ message: error.message });
+      return;
+    }
+
+    throw error;
+  }
 };
 
 export const deleteExistingProduct = async (
@@ -80,7 +100,9 @@ export const deleteExistingProduct = async (
 ) => {
   const { id } = request.params;
 
-  const validate = deleteProductSchema.parse({id})
+  const validate = deleteProductSchema.parse({ id });
 
   await deleteProduct(validate.id);
+
+  reply.status(204).send();
 };

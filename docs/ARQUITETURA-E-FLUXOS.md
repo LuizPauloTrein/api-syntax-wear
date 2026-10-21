@@ -38,10 +38,13 @@ PostgreSQL
 | --- | --- |
 | `src/app.ts` | Configura o Fastify, registra plugins, rotas, documentação, health check e o handler global de erros. Também inicia o servidor. |
 | `src/routes/products.routes.ts` | Registra os endpoints de produtos, seus schemas OpenAPI e o hook de autenticação JWT. |
+| `src/routes/categories.routes.ts` | Registra os endpoints públicos de leitura de categorias e seus schemas OpenAPI. |
 | `src/routes/auth.routes.ts` | Registra os endpoints públicos de cadastro e login e descreve os corpos esperados na documentação da API. |
 | `src/controllers/product.controller.ts` | Trata os parâmetros e corpos das requisições de produto, valida dados e chama os services. Gera o slug a partir do nome ao criar ou renomear. |
+| `src/controllers/category.controller.ts` | Valida o ID e coordena a listagem e a consulta de categorias. |
 | `src/controllers/auth.controller.ts` | Valida cadastro/login, chama os services de autenticação e emite tokens JWT. |
 | `src/services/products.service.ts` | Implementa consulta, criação, atualização e desativação de produtos usando Prisma. |
+| `src/services/categories.service.ts` | Implementa listagem e consulta de categorias por ID usando Prisma. |
 | `src/services/auth.service.ts` | Verifica unicidade de e-mail, cria usuários com senha hash e confere credenciais no login. |
 | `src/middlewares/auth.middleware.ts` | Verifica o JWT recebido nas rotas de produtos. |
 | `src/middlewares/error.middleware.ts` | Converte erros de validação conhecidos em respostas 400 e demais erros em resposta 500. |
@@ -63,7 +66,7 @@ PostgreSQL
 - **CORS:** aceita origens (`origin: true`) e credenciais.
 - **Helmet:** adiciona cabeçalhos de segurança; a Content Security Policy está desabilitada explicitamente.
 - **Swagger/OpenAPI e Scalar:** expõe a referência interativa em `/api-docs`.
-- **Rotas:** registra produtos com prefixo `/products` e autenticação com prefixo `/auth`.
+- **Rotas:** registra produtos com prefixo `/products`, categorias públicas com prefixo `/categories` e autenticação com prefixo `/auth`.
 - **Rotas gerais:** `/` retorna uma mensagem de status da aplicação e `/health` retorna estado e timestamp.
 - **Tratamento global de erros:** encaminha exceções para `errorHandler`.
 
@@ -82,6 +85,17 @@ A porta é lida de `PORT`, com padrão `3000`. A aplicação requer `DATABASE_UR
 | `npm run prisma:seed` | Executa `prisma/seed.ts` com `tsx`. |
 
 **Atenção:** o arquivo de entrada existente é `src/app.ts`, que, pela configuração atual do TypeScript, é compilado como `dist/app.js`. O script `start` aponta para `dist/server.js`, arquivo que não corresponde a essa entrada. Verifique esse script antes de usar o modo de produção.
+
+## Leitura de categorias
+
+As rotas públicas de categorias não exigem token:
+
+| Método e caminho | Ação | Comportamento atual |
+| --- | --- | --- |
+| `GET /categories` | Listar | Retorna as categorias cadastradas. |
+| `GET /categories/:id` | Consultar | Valida o ID e retorna a categoria correspondente. |
+
+O controller valida o parâmetro `id` com `categoryIdSchema` e chama `getCategoryById`; a persistência e as consultas são feitas pelo Prisma em `categories.service.ts`.
 
 ## CRUD de produtos
 

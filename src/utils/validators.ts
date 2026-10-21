@@ -48,6 +48,10 @@ export const productFiltersSchema = z
     },
   );
 
+export const categoryIdSchema = z.object({
+  id: z.coerce.number().int().positive("ID de categoria inválido"),
+});
+
 export const createProductSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   description: z.string().min(1, "Descricão é obrigatória"),
@@ -58,12 +62,14 @@ export const createProductSchema = z.object({
   stock: z.number().int().nonnegative("Estoque deve ser positivo"),
   active: z.boolean(),
   imgaes: z.array(z.string()).optional(),
+  categoryId: z.number().int().min(1, "ID de categoria inválido"),
 });
 
 export const updateProductSchema = z.object({
   name: z.string().min(1, "Nome é obrigatorio").optional(),
   description: z.string().min(1, "Descricao é obrigatoria").optional(),
   price: z.number().nonnegative("Preco deve ser positivo").optional(),
+  categoryId: z.number().int().min(1, "ID de categoria inválido").optional(),
   colors: z.array(z.string()).optional(),
   sizes: z.array(z.string()).optional(),
   slug: z.string().min(1, "Slug é obrigatorio").optional(),

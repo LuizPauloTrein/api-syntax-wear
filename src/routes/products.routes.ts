@@ -16,7 +16,6 @@ const productResponseSchema = {
     price: { type: "number" },
     createdAt: { type: "string", format: "date-time" },
     updatedAt: { type: "string", format: "date-time" },
-    color: { type: "string" },
     description: { type: "string" },
     stock: { type: "number" },
     sizes: {
@@ -33,6 +32,19 @@ const productResponseSchema = {
     },
     slug: { type: "string" },
     active: { type: "boolean" },
+    categoryId: { type: "number" },
+    category: {
+      type: "object",
+      properties: {
+        id: { type: "number" },
+        name: { type: "string" },
+        slug: { type: "string" },
+        description: { type: "string", nullable: true },
+        active: { type: "boolean" },
+        createdAt: { type: "string", format: "date-time" },
+        updatedAt: { type: "string", format: "date-time" },
+      },
+    },
   },
 };
 
@@ -122,13 +134,25 @@ export default async function productRoutes(fastify: FastifyInstance) {
       schema: {
         tags: ["Products"],
         description: "Criar um novo produto",
-        required: ["name", "description", "price", "slug", "active", "stock"],
         body: {
+          required: [
+            "name",
+            "description",
+            "price",
+            "active",
+            "stock",
+            "categoryId",
+          ],
           type: "object",
           properties: {
             name: { type: "string" },
             description: { type: "string" },
             price: { type: "number" },
+            categoryId: {
+              type: "integer",
+              minimum: 1,
+              description: "ID da categoria do produto",
+            },
             active: { type: "boolean" },
             stock: { type: "number" },
             colors: {
@@ -143,6 +167,19 @@ export default async function productRoutes(fastify: FastifyInstance) {
               type: "array",
               items: { type: "string" },
             },
+          },
+        },
+        response: {
+          201: {
+            description: "Produto criado com sucesso",
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
+          },
+          400: {
+            description: "Dados inválidos ou categoria inexistente",
+            ...errorResponseSchema,
           },
         },
       },
@@ -169,6 +206,11 @@ export default async function productRoutes(fastify: FastifyInstance) {
             name: { type: "string" },
             description: { type: "string" },
             price: { type: "number" },
+            categoryId: {
+              type: "integer",
+              minimum: 1,
+              description: "ID da categoria do produto",
+            },
             active: { type: "boolean" },
             stock: { type: "number" },
             colors: {
@@ -191,7 +233,7 @@ export default async function productRoutes(fastify: FastifyInstance) {
             ...productResponseSchema,
           },
           400: {
-            description: "Requisicao invalida",
+            description: "Dados inválidos ou categoria inexistente",
             ...errorResponseSchema,
           },
           404: {
@@ -225,6 +267,10 @@ export default async function productRoutes(fastify: FastifyInstance) {
         response: {
           200: {
             description: "Produto excluído",
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
           },
           401: {
             description: "Não autenticado",
