@@ -21,6 +21,12 @@ export interface CreateCategory {
   description?: string;
 }
 
+export interface UpdateCategory {
+  name?: string;
+  slug?: string;
+  description?: string | null;
+}
+
 export interface AuthRequest {
   email: string;
   password: string;

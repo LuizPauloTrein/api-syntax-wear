@@ -57,6 +57,21 @@ export const createCategorySchema = z.object({
   description: z.string().trim().min(1, "Descrição inválida").optional(),
 });
 
+export const updateCategorySchema = z
+  .object({
+    name: z.string().trim().min(1, "Nome é obrigatório").optional(),
+    description: z
+      .string()
+      .trim()
+      .min(1, "Descrição inválida")
+      .nullable()
+      .optional(),
+  })
+  .refine(
+    ({ name, description }) => name !== undefined || description !== undefined,
+    { message: "Informe ao menos um campo para atualizar" },
+  );
+
 export const createProductSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   description: z.string().min(1, "Descricão é obrigatória"),

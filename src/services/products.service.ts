@@ -73,7 +73,7 @@ export const createProduct = async (data: CreateProduct) => {
   }
 
   const existingCategory = await prisma.category.findUnique({
-    where: { id: data.categoryId },
+    where: { id: data.categoryId, active: true },
   });
 
   if (!existingCategory) {
@@ -95,7 +95,7 @@ export const updateProduct = async (id: number, data: UpdateProduct) => {
 
   if (data.categoryId !== undefined) {
     const existingCategory = await prisma.category.findUnique({
-      where: { id: data.categoryId },
+      where: { id: data.categoryId, active: true },
     });
 
     if (!existingCategory) {
