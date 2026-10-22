@@ -4,7 +4,7 @@ import {
   listCategories,
 } from "../controllers/category.controller.js";
 
-const categoryResponseSchema = {
+export const categoryResponseSchema = {
   type: "object",
   properties: {
     id: { type: "integer" },
@@ -15,7 +15,7 @@ const categoryResponseSchema = {
   required: ["id", "name", "slug"],
 };
 
-const errorResponseSchema = {
+export const errorResponseSchema = {
   type: "object",
   properties: {
     message: { type: "string" },

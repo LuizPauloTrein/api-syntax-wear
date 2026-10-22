@@ -52,6 +52,11 @@ export const categoryIdSchema = z.object({
   id: z.coerce.number().int().positive("ID de categoria inválido"),
 });
 
+export const createCategorySchema = z.object({
+  name: z.string().trim().min(1, "Nome é obrigatório"),
+  description: z.string().trim().min(1, "Descrição inválida").optional(),
+});
+
 export const createProductSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   description: z.string().min(1, "Descricão é obrigatória"),

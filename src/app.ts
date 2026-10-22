@@ -12,6 +12,7 @@ import scalar from "@scalar/fastify-api-reference";
 import jwt from "@fastify/jwt";
 import authRoutes from "./routes/auth.routes.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
+import adminCategoryRoutes from "./routes/adminCategories.routes.js";
 
 const PORT = parseInt(process.env.PORT ?? "3000");
 
@@ -69,6 +70,8 @@ fastify.register(scalar, {
 fastify.register(productRoutes, { prefix: "/products" });
 
 fastify.register(categoryRoutes, { prefix: "/categories" });
+
+fastify.register(adminCategoryRoutes, { prefix: "/admin/categories" });
 
 fastify.register(authRoutes, { prefix: "/auth" });
 
