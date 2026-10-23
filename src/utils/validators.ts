@@ -72,6 +72,27 @@ export const updateCategorySchema = z
     { message: "Informe ao menos um campo para atualizar" },
   );
 
+export const orderIdSchema = z.object({
+  id: z.coerce.number().int().positive("ID de pedido inválido"),
+});
+
+export const orderFiltersSchema = z.object({
+  page: z.coerce
+    .number()
+    .int()
+    .positive("Página deve ser um inteiro positivo")
+    .optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive("Limite deve ser um inteiro positivo")
+    .max(100, "Limite máximo é 100")
+    .optional(),
+  status: z
+    .enum(["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELED"])
+    .optional(),
+});
+
 export const createProductSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   description: z.string().min(1, "Descricão é obrigatória"),

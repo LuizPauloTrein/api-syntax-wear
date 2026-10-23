@@ -9,6 +9,19 @@ export interface ProductFilters {
   sortOrder?: "asc" | "desc";
 }
 
+export type OrderStatusValue =
+  | "PENDING"
+  | "PAID"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "CANCELED";
+
+export interface OrderFilters {
+  page?: number;
+  limit?: number;
+  status?: OrderStatusValue;
+}
+
 export interface CategoryFilters {
   page?: number;
   limit?: number;
