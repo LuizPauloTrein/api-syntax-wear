@@ -72,6 +72,34 @@ export const updateCategorySchema = z
     { message: "Informe ao menos um campo para atualizar" },
   );
 
+// O preço não faz parte do payload: o servidor sempre usa o preço do banco.
+export const createOrderSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        productId: z.number().int().positive("ID de produto inválido"),
+        quantity: z
+          .number()
+          .int("Quantidade deve ser um inteiro")
+          .min(1, "Quantidade deve ser no mínimo 1")
+          .max(99, "Quantidade máxima por item é 99"),
+        size: z.string().trim().min(1, "Tamanho inválido").optional(),
+      }),
+    )
+    .min(1, "O pedido deve ter ao menos um item"),
+  shippingAddress: z.object({
+    cep: z.string().regex(/^\d{8}$/, "CEP deve ter 8 dígitos numéricos"),
+    street: z.string().trim().min(1, "Rua é obrigatória"),
+    number: z.string().trim().min(1, "Número é obrigatório"),
+    complement: z.string().trim().min(1).optional(),
+    neighborhood: z.string().trim().min(1, "Bairro é obrigatório"),
+    city: z.string().trim().min(1, "Cidade é obrigatória"),
+    state: z.string().trim().min(1, "Estado é obrigatório"),
+    country: z.string().trim().min(1, "País é obrigatório"),
+  }),
+  paymentMethod: z.enum(["PIX", "CREDIT_CARD", "BOLETO"]),
+});
+
 export const orderIdSchema = z.object({
   id: z.coerce.number().int().positive("ID de pedido inválido"),
 });

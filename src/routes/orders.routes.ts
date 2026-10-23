@@ -1,6 +1,10 @@
 import { FastifyInstance } from "fastify";
+import {
+  createNewOrder,
+  getOrder,
+  listOrders,
+} from "../controllers/order.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
-import { getOrder, listOrders } from "../controllers/order.controller.js";
 
 const orderStatusEnum = ["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELED"];
 
@@ -57,6 +61,83 @@ const errorResponseSchema = {
 
 export default async function orderRoutes(fastify: FastifyInstance) {
   fastify.addHook("onRequest", authenticate);
+
+  fastify.post(
+    "/",
+    {
+      schema: {
+        tags: ["Orders"],
+        description:
+          "Cria um pedido para o usuário autenticado. O preço vem sempre do banco, o estoque é descontado na criação e o pedido nasce como PENDING",
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: "object",
+          required: ["items", "shippingAddress", "paymentMethod"],
+          properties: {
+            items: {
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "object",
+                required: ["productId", "quantity"],
+                properties: {
+                  productId: { type: "integer", minimum: 1 },
+                  quantity: { type: "integer", minimum: 1, maximum: 99 },
+                  size: { type: "string", description: "Obrigatório se o produto tiver tamanhos" },
+                },
+              },
+            },
+            shippingAddress: {
+              type: "object",
+              required: [
+                "cep",
+                "street",
+                "number",
+                "neighborhood",
+                "city",
+                "state",
+                "country",
+              ],
+              properties: {
+                cep: { type: "string", pattern: "^\\d{8}$" },
+                street: { type: "string" },
+                number: { type: "string" },
+                complement: { type: "string" },
+                neighborhood: { type: "string" },
+                city: { type: "string" },
+                state: { type: "string" },
+                country: { type: "string" },
+              },
+            },
+            paymentMethod: {
+              type: "string",
+              enum: ["PIX", "CREDIT_CARD", "BOLETO"],
+            },
+          },
+        },
+        response: {
+          201: {
+            description: "Pedido criado",
+            ...orderResponseSchema,
+          },
+          400: {
+            description:
+              "Dados inválidos, produto indisponível ou tamanho inválido",
+            ...errorResponseSchema,
+          },
+          401: {
+            description: "Não autenticado",
+            ...errorResponseSchema,
+          },
+          409: {
+            description: "Estoque insuficiente",
+            ...errorResponseSchema,
+          },
+        },
+      },
+    },
+    createNewOrder,
+  );
 
   fastify.get(
     "/",

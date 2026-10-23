@@ -16,6 +16,33 @@ export type OrderStatusValue =
   | "DELIVERED"
   | "CANCELED";
 
+// `type` (e não `interface`) para ser atribuível ao tipo Json do Prisma,
+// que exige assinatura de índice.
+export type ShippingAddress = {
+  cep: string;
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  country: string;
+};
+
+export type PaymentMethod = "PIX" | "CREDIT_CARD" | "BOLETO";
+
+export interface CreateOrderItem {
+  productId: number;
+  quantity: number;
+  size?: string;
+}
+
+export interface CreateOrder {
+  items: CreateOrderItem[];
+  shippingAddress: ShippingAddress;
+  paymentMethod: PaymentMethod;
+}
+
 export interface OrderFilters {
   page?: number;
   limit?: number;
