@@ -18,6 +18,7 @@ model User {
   birthDate DateTime?
   createdAt DateTime  @default(now())
   role      Role      @default(USER)
+  orders    Order[]
 }
 
 enum Role {
@@ -26,19 +27,20 @@ enum Role {
 }
 
 model Product {
-  id          Int      @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   name        String
-  slug        String   @unique
+  slug        String      @unique
   description String?
   price       Decimal
   images      Json?
   sizes       Json?
-  stock       Int      @default(0)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  stock       Int         @default(0)
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
   categoryId  Int?
-  category    Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  orderItems  OrderItem[]
 
   @@index([categoryId])
 }
@@ -50,4 +52,46 @@ model Category {
   description String?
   active      Boolean   @default(true)
   products    Product[]
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELED
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  userId          Int
+  user            User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  status          OrderStatus @default(PENDING)
+  subtotal        Decimal
+  shippingCost    Decimal     @default(0)
+  total           Decimal
+  shippingAddress Json
+  paymentMethod   String
+  items           OrderItem[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  canceledAt      DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderItem {
+  id          Int     @id @default(autoincrement())
+  orderId     Int
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   Int
+  product     Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productName String
+  price       Decimal
+  quantity    Int
+  size        String?
+
+  @@index([orderId])
+  @@index([productId])
 }
