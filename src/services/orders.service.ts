@@ -30,6 +30,17 @@ export class OrderInsufficientStockError extends Error {
   }
 }
 
+export class OrderNotCancelableError extends Error {
+  constructor(status: string) {
+    super(
+      status === "CANCELED"
+        ? "Pedido já foi cancelado"
+        : `Pedido com status ${status} não pode ser cancelado`,
+    );
+    this.name = "OrderNotCancelableError";
+  }
+}
+
 // Frete fixo até existir o cálculo por CEP (/shipping/calc).
 const SHIPPING_COST = 0;
 
@@ -166,4 +177,53 @@ export const getOrderById = async (id: number, userId: number) => {
   }
 
   return order;
+};
+
+// "Excluir" um pedido é cancelá-lo (soft delete): o registro é mantido para o
+// histórico e o estoque dos itens volta para os produtos.
+export const deleteOrder = async (id: number, userId: number) => {
+  await prisma.$transaction(async (tx) => {
+    // A mudança de status é a própria trava: só uma chamada consegue passar de
+    // PENDING/PAID para CANCELED, então o estoque nunca é devolvido duas vezes,
+    // mesmo com duas exclusões simultâneas.
+    const canceled = await tx.order.updateMany({
+      where: { id, userId, status: { in: ["PENDING", "PAID"] } },
+      data: { status: "CANCELED", canceledAt: new Date() },
+    });
+
+    if (canceled.count === 0) {
+      const existing = await tx.order.findFirst({
+        where: { id, userId },
+        select: { status: true },
+      });
+
+      if (!existing) {
+        throw new OrderNotFoundError();
+      }
+
+      throw new OrderNotCancelableError(existing.status);
+    }
+
+    const items = await tx.orderItem.findMany({ where: { orderId: id } });
+
+    // Soma por produto (o mesmo produto pode aparecer em mais de um tamanho)
+    // e devolve em ordem fixa, como na criação, para evitar deadlock.
+    const toRestore = new Map<number, number>();
+
+    for (const item of items) {
+      toRestore.set(
+        item.productId,
+        (toRestore.get(item.productId) ?? 0) + item.quantity,
+      );
+    }
+
+    for (const [productId, quantity] of [...toRestore].sort(
+      (a, b) => a[0] - b[0],
+    )) {
+      await tx.product.update({
+        where: { id: productId },
+        data: { stock: { increment: quantity } },
+      });
+    }
+  });
 };

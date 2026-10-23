@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import {
   createNewOrder,
+  deleteExistingOrder,
   getOrder,
   listOrders,
 } from "../controllers/order.controller.js";
@@ -210,5 +211,48 @@ export default async function orderRoutes(fastify: FastifyInstance) {
       },
     },
     getOrder,
+  );
+
+  fastify.delete(
+    "/:id",
+    {
+      schema: {
+        tags: ["Orders"],
+        description:
+          "Exclui (cancela) um pedido do usuário autenticado. É um soft delete: o pedido fica com status CANCELED e o estoque dos itens é devolvido. Só é possível enquanto o pedido estiver PENDING ou PAID",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          properties: {
+            id: { type: "integer", minimum: 1, description: "ID do pedido" },
+          },
+          required: ["id"],
+        },
+        response: {
+          204: {
+            description: "Pedido cancelado",
+            type: "null",
+          },
+          400: {
+            description: "ID de pedido inválido",
+            ...errorResponseSchema,
+          },
+          401: {
+            description: "Não autenticado",
+            ...errorResponseSchema,
+          },
+          404: {
+            description: "Pedido não encontrado",
+            ...errorResponseSchema,
+          },
+          409: {
+            description:
+              "Pedido já cancelado ou em status que não permite cancelamento",
+            ...errorResponseSchema,
+          },
+        },
+      },
+    },
+    deleteExistingOrder,
   );
 }

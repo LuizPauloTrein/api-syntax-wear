@@ -2,9 +2,11 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import {
   OrderInsufficientStockError,
   OrderInvalidSizeError,
+  OrderNotCancelableError,
   OrderNotFoundError,
   OrderProductUnavailableError,
   createOrder,
+  deleteOrder,
   getOrderById,
   getOrders,
 } from "../services/orders.service.js";
@@ -66,6 +68,30 @@ export const getOrder = async (
   } catch (error) {
     if (error instanceof OrderNotFoundError) {
       reply.status(404).send({ message: error.message });
+      return;
+    }
+
+    throw error;
+  }
+};
+
+export const deleteExistingOrder = async (
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply,
+) => {
+  const { id } = orderIdSchema.parse(request.params);
+
+  try {
+    await deleteOrder(id, getUserId(request));
+    reply.status(204).send();
+  } catch (error) {
+    if (error instanceof OrderNotFoundError) {
+      reply.status(404).send({ message: error.message });
+      return;
+    }
+
+    if (error instanceof OrderNotCancelableError) {
+      reply.status(409).send({ message: error.message });
       return;
     }
 
