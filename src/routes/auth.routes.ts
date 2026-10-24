@@ -2,6 +2,25 @@ import { FastifyInstance } from "fastify";
 import { login, register } from "../controllers/auth.controller.js";
 import { AuthRequest, RegisterRequest } from "../types/index.js";
 
+// Schema de resposta: o Fastify descarta qualquer campo que não esteja aqui,
+// então mesmo um erro no controller não vaza senha, CPF ou telefone.
+const authResponseSchema = {
+  type: "object",
+  properties: {
+    user: {
+      type: "object",
+      properties: {
+        id: { type: "integer" },
+        firstName: { type: "string" },
+        lastName: { type: "string" },
+        email: { type: "string" },
+        role: { type: "string", enum: ["USER", "ADMIN"] },
+      },
+    },
+    token: { type: "string" },
+  },
+};
+
 export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: AuthRequest }>(
     "/login",
@@ -22,6 +41,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
               description: "Senha do usuario",
             },
           },
+        },
+        response: {
+          200: { description: "Login realizado", ...authResponseSchema },
         },
       },
     },
@@ -67,6 +89,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
               description: "Telefone do usuario",
             },
           },
+        },
+        response: {
+          201: { description: "Usuário criado", ...authResponseSchema },
         },
       },
     },

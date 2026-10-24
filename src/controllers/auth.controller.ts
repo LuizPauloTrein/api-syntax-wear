@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { loginUser, registerUser } from "../services/auth.service.js";
 import { AuthRequest, RegisterRequest } from "../types/index.js";
+import { toUserResponse } from "../utils/mappers.js";
 import { loginSchema, registerSchema } from "../utils/validators.js";
 
 export const register = async (
@@ -14,7 +15,7 @@ export const register = async (
   const token = request.server.jwt.sign({ userId: user.id });
 
   reply.status(201).send({
-    user,
+    user: toUserResponse(user),
     token,
   });
 };
@@ -30,7 +31,7 @@ export const login = async (
   const token = request.server.jwt.sign({ userId: user.id });
 
   reply.status(200).send({
-    user,
+    user: toUserResponse(user),
     token,
   });
 };
