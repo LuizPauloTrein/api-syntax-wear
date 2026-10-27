@@ -65,7 +65,7 @@ export default async function productRoutes(fastify: FastifyInstance) {
           type: "object",
           properties: {
             page: { type: "number" },
-            limit: { type: "number" },
+            limit: { type: "number", minimum: 1, maximum: 100 },
             minPrice: { type: "number" },
             maxPrice: { type: "number" },
             search: { type: "string" },
@@ -117,6 +117,10 @@ export default async function productRoutes(fastify: FastifyInstance) {
           },
           401: {
             description: "Não autorizado",
+            ...errorResponseSchema,
+          },
+          404: {
+            description: "Produto não encontrado ou inativo",
             ...errorResponseSchema,
           },
         },

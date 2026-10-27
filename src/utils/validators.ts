@@ -26,6 +26,7 @@ export const productFiltersSchema = z
       .number()
       .int()
       .positive("Limite deve ser um inteiro positivo")
+      .max(100, "Limite máximo é 100")
       .optional(),
     minPrice: z.coerce
       .number()

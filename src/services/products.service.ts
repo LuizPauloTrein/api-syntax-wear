@@ -17,7 +17,9 @@ export const getProducts = async (filter: ProductFilters) => {
     sortOrder = "desc",
   } = filter;
 
+  // Rotas públicas só enxergam produtos ativos (os inativos foram "excluídos").
   const where: Prisma.ProductWhereInput = {
+    active: true,
     ...(minPrice !== undefined || maxPrice !== undefined
       ? {
           price: {
@@ -44,13 +46,20 @@ export const getProducts = async (filter: ProductFilters) => {
   });
 };
 
+export class ProductNotFoundError extends Error {
+  constructor() {
+    super("Produto não encontrado");
+    this.name = "ProductNotFoundError";
+  }
+}
+
 export const getProductById = async (id: number) => {
   const product = await prisma.product.findUnique({
-    where: { id },
+    where: { id, active: true },
   });
 
   if (!product) {
-    throw new Error("Produto não encontrado");
+    throw new ProductNotFoundError();
   }
 
   return product;

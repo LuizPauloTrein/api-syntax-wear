@@ -7,6 +7,7 @@ import {
   updateProduct,
   deleteProduct,
   ProductCategoryNotFoundError,
+  ProductNotFoundError,
 } from "../services/products.service.js";
 import {
   createProductSchema,
@@ -29,8 +30,17 @@ export const getProduct = async (
   request: FastifyRequest<{ Params: { id: number } }>,
   reply: FastifyReply,
 ) => {
-  const product = await getProductById(request.params.id);
-  reply.status(200).send(product);
+  try {
+    const product = await getProductById(request.params.id);
+    reply.status(200).send(product);
+  } catch (error) {
+    if (error instanceof ProductNotFoundError) {
+      reply.status(404).send({ message: error.message });
+      return;
+    }
+
+    throw error;
+  }
 };
 
 export const createNewProduct = async (

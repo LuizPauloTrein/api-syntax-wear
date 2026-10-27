@@ -2,6 +2,8 @@ import { prisma } from "../utils/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { CreateCategory, UpdateCategory } from "../types/index.js";
 
+const CATEGORY_PRODUCTS_LIMIT = 100;
+
 export class CategoryNotFoundError extends Error {
   constructor() {
     super("Categoria não encontrada");
@@ -119,7 +121,12 @@ export const getCategoryById = async (id: number) => {
   const category = await prisma.category.findUnique({
     where: { id, active: true },
     include: {
-      products: true,
+      // Só produtos ativos e com teto, para a resposta não crescer sem limite.
+      products: {
+        where: { active: true },
+        orderBy: { id: "asc" },
+        take: CATEGORY_PRODUCTS_LIMIT,
+      },
     },
   });
 

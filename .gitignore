@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 yarn.lock
 
 # Environment variables
@@ -39,5 +38,4 @@ coverage/
 .nyc_output/
 
 # Prisma
-prisma/migrations/
 src/generated/

@@ -109,7 +109,8 @@ const demoCustomer = {
   firstName: "Cliente",
   lastName: "Demo",
   email: "cliente.demo@syntaxwear.dev",
-  password: "123456",
+  // Só para desenvolvimento. Troque definindo SEED_DEMO_PASSWORD no .env.
+  password: process.env.SEED_DEMO_PASSWORD ?? "123456",
 };
 
 const shippingAddress = {
@@ -241,6 +242,14 @@ async function seedOrders() {
 }
 
 async function main() {
+  // O seed sobrescreve preço e estoque dos produtos e cria um usuário demo com
+  // senha conhecida: nunca deve rodar em produção.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "O seed não pode rodar com NODE_ENV=production (sobrescreve produtos e cria usuário demo).",
+    );
+  }
+
   await prisma.$transaction(
     products.map((data) =>
       prisma.product.upsert({
