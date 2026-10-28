@@ -1,9 +1,6 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import slugify from "slugify";
 import {
-  CategoryHasProductsError,
-  CategoryNotFoundError,
-  CategorySlugAlreadyExistsError,
   createCategory,
   deleteCategory,
   getCategories,
@@ -23,22 +20,8 @@ export const deleteExistingCategory = async (
 ) => {
   const { id } = categoryIdSchema.parse(request.params);
 
-  try {
-    await deleteCategory(id);
-    reply.status(204).send();
-  } catch (error) {
-    if (error instanceof CategoryNotFoundError) {
-      reply.status(404).send({ message: error.message });
-      return;
-    }
-
-    if (error instanceof CategoryHasProductsError) {
-      reply.status(409).send({ message: error.message });
-      return;
-    }
-
-    throw error;
-  }
+  await deleteCategory(id);
+  reply.status(204).send();
 };
 
 export const updateExistingCategory = async (
@@ -68,22 +51,8 @@ export const updateExistingCategory = async (
     }
   }
 
-  try {
-    const category = await updateCategory(id, { name, slug, description });
-    reply.status(200).send(category);
-  } catch (error) {
-    if (error instanceof CategoryNotFoundError) {
-      reply.status(404).send({ message: error.message });
-      return;
-    }
-
-    if (error instanceof CategorySlugAlreadyExistsError) {
-      reply.status(409).send({ message: error.message });
-      return;
-    }
-
-    throw error;
-  }
+  const category = await updateCategory(id, { name, slug, description });
+  reply.status(200).send(category);
 };
 
 export const createNewCategory = async (
@@ -105,17 +74,8 @@ export const createNewCategory = async (
     return;
   }
 
-  try {
-    const category = await createCategory({ name, slug, description });
-    reply.status(201).send(category);
-  } catch (error) {
-    if (error instanceof CategorySlugAlreadyExistsError) {
-      reply.status(409).send({ message: error.message });
-      return;
-    }
-
-    throw error;
-  }
+  const category = await createCategory({ name, slug, description });
+  reply.status(201).send(category);
 };
 
 export const listCategories = async (
@@ -132,15 +92,6 @@ export const getCategory = async (
 ) => {
   const { id } = categoryIdSchema.parse(request.params);
 
-  try {
-    const category = await getCategoryById(id);
-    reply.status(200).send(category);
-  } catch (error) {
-    if (error instanceof CategoryNotFoundError) {
-      reply.status(404).send({ message: error.message });
-      return;
-    }
-
-    throw error;
-  }
+  const category = await getCategoryById(id);
+  reply.status(200).send(category);
 };

@@ -3,7 +3,6 @@ import {
   getProduct,
   listProducts,
 } from "../controllers/product.controller.js";
-import { authenticate } from "../middlewares/auth.middleware.js";
 
 export const productResponseSchema = {
   type: "object",
@@ -53,8 +52,6 @@ export const errorResponseSchema = {
 };
 
 export default async function productRoutes(fastify: FastifyInstance) {
-  fastify.addHook("onRequest", authenticate);
-
   fastify.get(
     "/",
     {
@@ -83,10 +80,6 @@ export default async function productRoutes(fastify: FastifyInstance) {
             description: "Requisicao invalida",
             ...errorResponseSchema,
           },
-          401: {
-            description: "Não autorizado",
-            ...errorResponseSchema,
-          },
         },
       },
     },
@@ -113,10 +106,6 @@ export default async function productRoutes(fastify: FastifyInstance) {
           },
           400: {
             description: "Requisicao invalida",
-            ...errorResponseSchema,
-          },
-          401: {
-            description: "Não autorizado",
             ...errorResponseSchema,
           },
           404: {

@@ -6,6 +6,7 @@ import {
   listOrders,
 } from "../controllers/order.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
+import { rateLimits } from "../config/rate-limits.js";
 
 const orderStatusEnum = ["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELED"];
 
@@ -66,6 +67,7 @@ export default async function orderRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/",
     {
+      config: { rateLimit: rateLimits.createOrder },
       schema: {
         tags: ["Orders"],
         description:

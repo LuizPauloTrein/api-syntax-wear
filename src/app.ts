@@ -1,109 +1,105 @@
-// Require the framework and instantiate it
-
-// ESM
-import Fastify, { FastifyError } from "fastify";
-import "dotenv/config";
+import Fastify from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
-import productRoutes from "./routes/products.routes.js";
-import categoryRoutes from "./routes/categories.routes.js";
-import orderRoutes from "./routes/orders.routes.js";
+import rateLimit from "@fastify/rate-limit";
+import jwt from "@fastify/jwt";
 import swagger from "@fastify/swagger";
 import scalar from "@scalar/fastify-api-reference";
-import jwt from "@fastify/jwt";
+import { env } from "./config/env.js";
+import { rateLimits } from "./config/rate-limits.js";
+import productRoutes from "./routes/products.routes.js";
+import adminProductRoutes from "./routes/admin-products.routes.js";
+import categoryRoutes from "./routes/categories.routes.js";
+import orderRoutes from "./routes/orders.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 import adminCategoryRoutes from "./routes/adminCategories.routes.js";
-import adminProductRoutes from "./routes/admin-products.routes (1).js";
-
-const PORT = parseInt(process.env.PORT ?? "3000");
-const isProduction = process.env.NODE_ENV === "production";
-
-// JWT: a API não sobe com segredo ausente ou curto (um segredo fraco permite
-// forjar tokens, inclusive de ADMIN). Gere um com:
-//   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error(
-    "JWT_SECRET ausente ou curto demais: defina um segredo aleatório com pelo menos 32 caracteres no .env",
-  );
-}
-
-// Tokens expiram (padrão: 1 hora). Aceita "15m", "1h", "7d" etc.
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? "1h";
-
-// CORS: só as origens listadas em CORS_ORIGINS (separadas por vírgula).
-// Fora de produção, sem a variável, libera apenas o front local.
-const corsOrigins = (process.env.CORS_ORIGINS ?? "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-const allowedOrigins =
-  corsOrigins.length > 0
-    ? corsOrigins
-    : isProduction
-      ? []
-      : ["http://localhost:5173", "http://localhost:3000"];
 
 const fastify = Fastify({
-  logger: true,
+  logger: {
+    level: env.logLevel,
+    // Nunca registra credenciais nos logs.
+    redact: ["req.headers.authorization", "req.headers.cookie"],
+  },
+  // Atrás de proxy, o IP real (usado no rate limit) vem do X-Forwarded-For.
+  // O tipo do Fastify não lista número, mas a função abaixo equivale a "N proxies".
+  trustProxy:
+    typeof env.trustProxy === "number"
+      ? (_address: string, hop: number) => hop < (env.trustProxy as number)
+      : env.trustProxy,
+  // Corpos JSON desta API são pequenos: 100 KB basta e reduz abuso.
+  bodyLimit: 100 * 1024,
 });
 
-if (isProduction && allowedOrigins.length === 0) {
+if (env.isProduction && env.corsOrigins.length === 0) {
   fastify.log.warn(
     "CORS_ORIGINS não definido em produção: nenhuma origem de navegador está autorizada",
   );
 }
 
+fastify.register(rateLimit, {
+  global: true,
+  ...rateLimits.global,
+  errorResponseBuilder: (_request, context) => ({
+    statusCode: 429,
+    error: "Too Many Requests",
+    message: `Muitas requisições. Tente novamente em ${context.after}.`,
+  }),
+});
+
 fastify.register(jwt, {
-  secret: JWT_SECRET,
-  sign: { expiresIn: JWT_EXPIRES_IN },
+  secret: env.jwtSecret,
+  sign: { expiresIn: env.jwtExpiresIn },
 });
 
 fastify.register(cors, {
-  origin: allowedOrigins,
+  origin: env.corsOrigins,
   credentials: true,
 });
 
 fastify.register(helmet, {
-  contentSecurityPolicy: false,
+  // A página de documentação precisa de scripts inline; sem ela (produção),
+  // a API só devolve JSON e pode usar a política mais restrita.
+  contentSecurityPolicy: env.docsEnabled
+    ? false
+    : { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
 });
 
-fastify.register(swagger, {
-  openapi: {
-    openapi: "3.0.0",
-    info: {
-      title: "Syntax Wear API",
-      description: "API para o e-commerce Syntax Wear",
-      version: "1.0.0",
-    },
-    servers: [
-      {
-        url: `http://localhost:${PORT}`,
-        description: "Servidor de desenvolvimento",
+if (env.docsEnabled) {
+  fastify.register(swagger, {
+    openapi: {
+      openapi: "3.0.0",
+      info: {
+        title: "Syntax Wear API",
+        description: "API para o e-commerce Syntax Wear",
+        version: "1.0.0",
       },
-    ],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: "http",
-          scheme: "bearer",
-          bearerFormat: "JWT",
-          description: "Autenticacao via token JWT",
+      servers: [
+        {
+          url: `http://localhost:${env.port}`,
+          description: "Servidor de desenvolvimento",
+        },
+      ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+            description: "Autenticacao via token JWT",
+          },
         },
       },
     },
-  },
-});
+  });
 
-fastify.register(scalar, {
-  routePrefix: "/api-docs",
-  configuration: {
-    theme: "default",
-  },
-});
+  fastify.register(scalar, {
+    routePrefix: "/api-docs",
+    configuration: {
+      theme: "default",
+    },
+  });
+}
 
 fastify.register(productRoutes, { prefix: "/products" });
 
@@ -136,7 +132,7 @@ fastify.get("/health", async (request, reply) => {
 fastify.setErrorHandler(errorHandler);
 
 // Run the server!
-fastify.listen({ port: PORT }, function (err, address) {
+fastify.listen({ port: env.port }, function (err, address) {
   if (err) {
     fastify.log.error(err);
     process.exit(1);

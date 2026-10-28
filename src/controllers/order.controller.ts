@@ -1,10 +1,5 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import {
-  OrderInsufficientStockError,
-  OrderInvalidSizeError,
-  OrderNotCancelableError,
-  OrderNotFoundError,
-  OrderProductUnavailableError,
   createOrder,
   deleteOrder,
   getOrderById,
@@ -26,25 +21,8 @@ export const createNewOrder = async (
 ) => {
   const data = createOrderSchema.parse(request.body);
 
-  try {
-    const order = await createOrder(getUserId(request), data);
-    reply.status(201).send(order);
-  } catch (error) {
-    if (
-      error instanceof OrderProductUnavailableError ||
-      error instanceof OrderInvalidSizeError
-    ) {
-      reply.status(400).send({ message: error.message });
-      return;
-    }
-
-    if (error instanceof OrderInsufficientStockError) {
-      reply.status(409).send({ message: error.message });
-      return;
-    }
-
-    throw error;
-  }
+  const order = await createOrder(getUserId(request), data);
+  reply.status(201).send(order);
 };
 
 export const listOrders = async (
@@ -62,17 +40,8 @@ export const getOrder = async (
 ) => {
   const { id } = orderIdSchema.parse(request.params);
 
-  try {
-    const order = await getOrderById(id, getUserId(request));
-    reply.status(200).send(order);
-  } catch (error) {
-    if (error instanceof OrderNotFoundError) {
-      reply.status(404).send({ message: error.message });
-      return;
-    }
-
-    throw error;
-  }
+  const order = await getOrderById(id, getUserId(request));
+  reply.status(200).send(order);
 };
 
 export const deleteExistingOrder = async (
@@ -81,20 +50,6 @@ export const deleteExistingOrder = async (
 ) => {
   const { id } = orderIdSchema.parse(request.params);
 
-  try {
-    await deleteOrder(id, getUserId(request));
-    reply.status(204).send();
-  } catch (error) {
-    if (error instanceof OrderNotFoundError) {
-      reply.status(404).send({ message: error.message });
-      return;
-    }
-
-    if (error instanceof OrderNotCancelableError) {
-      reply.status(409).send({ message: error.message });
-      return;
-    }
-
-    throw error;
-  }
+  await deleteOrder(id, getUserId(request));
+  reply.status(204).send();
 };

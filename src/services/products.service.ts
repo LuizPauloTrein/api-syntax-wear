@@ -5,6 +5,11 @@ import {
   ProductFilters,
   UpdateProduct,
 } from "../types/index.js";
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from "../errors/app-error.js";
 
 export const getProducts = async (filter: ProductFilters) => {
   const {
@@ -46,7 +51,7 @@ export const getProducts = async (filter: ProductFilters) => {
   });
 };
 
-export class ProductNotFoundError extends Error {
+export class ProductNotFoundError extends NotFoundError {
   constructor() {
     super("Produto não encontrado");
     this.name = "ProductNotFoundError";
@@ -65,7 +70,14 @@ export const getProductById = async (id: number) => {
   return product;
 };
 
-export class ProductCategoryNotFoundError extends Error {
+export class ProductSlugAlreadyExistsError extends ConflictError {
+  constructor() {
+    super("Slug já existe, escolha outro nome para o produto");
+    this.name = "ProductSlugAlreadyExistsError";
+  }
+}
+
+export class ProductCategoryNotFoundError extends BadRequestError {
   constructor() {
     super("Categoria não encontrada");
     this.name = "ProductCategoryNotFoundError";
@@ -78,7 +90,7 @@ export const createProduct = async (data: CreateProduct) => {
   });
 
   if (existingProduct) {
-    throw new Error("Slug ja existe, escolha outro nome para o produto");
+    throw new ProductSlugAlreadyExistsError();
   }
 
   const existingCategory = await prisma.category.findUnique({
@@ -99,7 +111,7 @@ export const updateProduct = async (id: number, data: UpdateProduct) => {
   });
 
   if (!existingProduct) {
-    throw new Error("Produto nao encontrado");
+    throw new ProductNotFoundError();
   }
 
   if (data.categoryId !== undefined) {
@@ -118,7 +130,7 @@ export const updateProduct = async (id: number, data: UpdateProduct) => {
     });
 
     if (slugExists && slugExists.id !== id) {
-      throw new Error("Slug ja existe, escolha outro nome para o produto");
+      throw new ProductSlugAlreadyExistsError();
     }
   }
 
@@ -137,7 +149,7 @@ export const deleteProduct = async (id: number) => {
   });
 
   if (!existingProduct) {
-    throw new Error("Produto nao encontrado");
+    throw new ProductNotFoundError();
   }
 
   await prisma.product.update({

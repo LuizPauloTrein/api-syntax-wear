@@ -1,18 +1,70 @@
-import z, { optional } from "zod";
+import z from "zod";
 
+const onlyDigits = (value: string) => value.replace(/\D/g, "");
+
+const isValidCpf = (digits: string) => {
+  if (!/^\d{11}$/.test(digits) || /^(\d)\1{10}$/.test(digits)) return false;
+
+  const check = (length: number) => {
+    let sum = 0;
+    for (let i = 0; i < length; i++) {
+      sum += Number(digits[i]) * (length + 1 - i);
+    }
+    const rest = (sum * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+
+  return check(9) === Number(digits[9]) && check(10) === Number(digits[10]);
+};
+
+// Normaliza antes de validar: "  Ana@Mail.com " vira "ana@mail.com".
+const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.email("Email inválido").max(254, "Email muito longo"));
+
+// O bcrypt só considera os 72 primeiros bytes: acima disso a senha seria
+// truncada em silêncio.
+const passwordSchema = z
+  .string()
+  .min(8, "Senha deve ter no mínimo 8 caracteres")
+  .refine((value) => Buffer.byteLength(value) <= 72, "Senha muito longa")
+  .refine(
+    (value) => /[A-Za-z]/.test(value) && /\d/.test(value),
+    "Senha deve conter ao menos uma letra e um número",
+  );
+
+// No login a política não é aplicada: contas antigas (senha com 6 caracteres)
+// continuam entrando, e a resposta não revela as regras de senha.
 export const loginSchema = z.object({
-  email: z.email("Email inválido"),
-  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+  email: emailSchema,
+  password: z.string().min(1, "Senha é obrigatória").max(128),
 });
 
 export const registerSchema = z.object({
-  firstName: z.string().min(1, "Nome é obrigatório"),
-  lastName: z.string().min(1, "Sobrenome é obrigatório"),
-  email: z.email("Email inválido"),
-  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
-  cpf: z.string().optional(),
-  dateBirth: z.iso.date("Data de nascimento inválida").optional(),
-  phone: z.string().optional(),
+  firstName: z.string().trim().min(1, "Nome é obrigatório").max(100),
+  lastName: z.string().trim().min(1, "Sobrenome é obrigatório").max(100),
+  email: emailSchema,
+  password: passwordSchema,
+  cpf: z
+    .string()
+    .transform(onlyDigits)
+    .refine(isValidCpf, "CPF inválido")
+    .optional(),
+  dateBirth: z.iso
+    .date("Data de nascimento inválida")
+    .transform((value) => new Date(`${value}T00:00:00.000Z`))
+    .refine(
+      (date) => date.getTime() <= Date.now() && date.getUTCFullYear() >= 1900,
+      "Data de nascimento inválida",
+    )
+    .optional(),
+  phone: z
+    .string()
+    .transform(onlyDigits)
+    .refine((digits) => /^\d{10,11}$/.test(digits), "Telefone inválido")
+    .optional(),
 });
 
 export const productFiltersSchema = z

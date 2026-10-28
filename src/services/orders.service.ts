@@ -1,36 +1,41 @@
 import { prisma } from "../utils/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { CreateOrder, OrderFilters } from "../types/index.js";
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from "../errors/app-error.js";
 
-export class OrderNotFoundError extends Error {
+export class OrderNotFoundError extends NotFoundError {
   constructor() {
     super("Pedido não encontrado");
     this.name = "OrderNotFoundError";
   }
 }
 
-export class OrderProductUnavailableError extends Error {
+export class OrderProductUnavailableError extends BadRequestError {
   constructor(productId: number) {
     super(`Produto ${productId} não existe ou não está disponível`);
     this.name = "OrderProductUnavailableError";
   }
 }
 
-export class OrderInvalidSizeError extends Error {
+export class OrderInvalidSizeError extends BadRequestError {
   constructor(productName: string) {
     super(`Tamanho inválido para o produto "${productName}"`);
     this.name = "OrderInvalidSizeError";
   }
 }
 
-export class OrderInsufficientStockError extends Error {
+export class OrderInsufficientStockError extends ConflictError {
   constructor(productName: string) {
     super(`Estoque insuficiente para o produto "${productName}"`);
     this.name = "OrderInsufficientStockError";
   }
 }
 
-export class OrderNotCancelableError extends Error {
+export class OrderNotCancelableError extends ConflictError {
   constructor(status: string) {
     super(
       status === "CANCELED"

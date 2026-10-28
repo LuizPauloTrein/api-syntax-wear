@@ -1,24 +1,25 @@
 import { prisma } from "../utils/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { CreateCategory, UpdateCategory } from "../types/index.js";
+import { ConflictError, NotFoundError } from "../errors/app-error.js";
 
 const CATEGORY_PRODUCTS_LIMIT = 100;
 
-export class CategoryNotFoundError extends Error {
+export class CategoryNotFoundError extends NotFoundError {
   constructor() {
     super("Categoria não encontrada");
     this.name = "CategoryNotFoundError";
   }
 }
 
-export class CategorySlugAlreadyExistsError extends Error {
+export class CategorySlugAlreadyExistsError extends ConflictError {
   constructor() {
     super("Já existe uma categoria com esse nome, escolha outro nome");
     this.name = "CategorySlugAlreadyExistsError";
   }
 }
 
-export class CategoryHasProductsError extends Error {
+export class CategoryHasProductsError extends ConflictError {
   constructor() {
     super(
       "Não é possível excluir a categoria: existem produtos ativos associados a ela",

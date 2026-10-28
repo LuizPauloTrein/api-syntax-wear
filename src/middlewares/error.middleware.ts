@@ -1,5 +1,6 @@
 import { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import z, { ZodError } from "zod";
+import { AppError } from "../errors/app-error.js";
 
 export const errorHandler = (
   error: FastifyError,
@@ -11,6 +12,11 @@ export const errorHandler = (
       message: "Erro de validacao",
       errors: z.treeifyError(error),
     });
+  }
+
+  // Erros de domínio (404, 409...) já trazem status e mensagem seguros.
+  if (error instanceof AppError) {
+    return reply.status(error.statusCode).send({ message: error.message });
   }
 
   if (error.code === "FST_ERR_VALIDATION") {

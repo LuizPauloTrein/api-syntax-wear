@@ -80,6 +80,12 @@ export interface RegisterRequest extends AuthRequest {
   phone?: string;
 }
 
+// Dados já validados e normalizados pelo registerSchema (data como Date, CPF e
+// telefone só com dígitos).
+export type RegisterData = Omit<RegisterRequest, "dateBirth"> & {
+  dateBirth?: Date;
+};
+
 export interface CreateProduct {
   name: string;
   description: string;

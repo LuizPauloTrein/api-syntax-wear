@@ -8,7 +8,7 @@ export const register = async (
   request: FastifyRequest<{ Body: RegisterRequest }>,
   reply: FastifyReply,
 ) => {
-  const validation = registerSchema.parse(request.body as RegisterRequest);
+  const validation = registerSchema.parse(request.body);
 
   const user = await registerUser(validation);
 
@@ -24,7 +24,7 @@ export const login = async (
   request: FastifyRequest<{ Body: AuthRequest }>,
   reply: FastifyReply,
 ) => {
-  const validation = loginSchema.parse(request.body as AuthRequest);
+  const validation = loginSchema.parse(request.body);
 
   const user = await loginUser(validation);
 
