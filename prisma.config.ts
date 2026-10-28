@@ -7,6 +7,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // Migrations usam a conexão DIRETA (porta 5432); a API usa o pooler via
+    // DATABASE_URL. Sem DIRECT_URL, cai em DATABASE_URL.
+    url: process.env.DIRECT_URL || env("DATABASE_URL"),
   },
 });

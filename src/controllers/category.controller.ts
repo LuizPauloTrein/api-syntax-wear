@@ -8,7 +8,9 @@ import {
   updateCategory,
 } from "../services/categories.service.js";
 import { CreateCategory, UpdateCategory } from "../types/index.js";
+import { toCategoryResponse } from "../utils/mappers.js";
 import {
+  categoryFiltersSchema,
   categoryIdSchema,
   createCategorySchema,
   updateCategorySchema,
@@ -52,7 +54,7 @@ export const updateExistingCategory = async (
   }
 
   const category = await updateCategory(id, { name, slug, description });
-  reply.status(200).send(category);
+  reply.status(200).send(toCategoryResponse(category));
 };
 
 export const createNewCategory = async (
@@ -75,15 +77,18 @@ export const createNewCategory = async (
   }
 
   const category = await createCategory({ name, slug, description });
-  reply.status(201).send(category);
+  reply.status(201).send(toCategoryResponse(category));
 };
 
 export const listCategories = async (
-  _request: FastifyRequest,
+  request: FastifyRequest,
   reply: FastifyReply,
 ) => {
-  const categories = await getCategories();
-  reply.status(200).send(categories);
+  const filters = categoryFiltersSchema.parse(request.query);
+  const result = await getCategories(filters);
+  reply
+    .status(200)
+    .send({ ...result, data: result.data.map(toCategoryResponse) });
 };
 
 export const getCategory = async (
@@ -93,5 +98,5 @@ export const getCategory = async (
   const { id } = categoryIdSchema.parse(request.params);
 
   const category = await getCategoryById(id);
-  reply.status(200).send(category);
+  reply.status(200).send(toCategoryResponse(category));
 };

@@ -27,22 +27,24 @@ enum Role {
 }
 
 model Product {
-  id          Int         @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   name        String
-  slug        String      @unique
+  slug        String   @unique
   description String?
   price       Decimal
   images      Json?
   sizes       Json?
-  stock       Int         @default(0)
-  active      Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  stock       Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   categoryId  Int?
-  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   orderItems  OrderItem[]
 
   @@index([categoryId])
+  // Listagem pública: filtra por active e ordena por createdAt.
+  @@index([active, createdAt])
 }
 
 model Category {
@@ -52,6 +54,8 @@ model Category {
   description String?
   active      Boolean   @default(true)
   products    Product[]
+
+  @@index([active])
 }
 
 enum OrderStatus {
@@ -77,8 +81,9 @@ model Order {
   updatedAt       DateTime    @updatedAt
   canceledAt      DateTime?
 
-  @@index([userId])
-  @@index([status])
+  // "Meus pedidos" (por usuário, mais recentes primeiro) e filtro por status.
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 model OrderItem {

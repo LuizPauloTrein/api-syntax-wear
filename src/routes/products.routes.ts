@@ -3,6 +3,8 @@ import {
   getProduct,
   listProducts,
 } from "../controllers/product.controller.js";
+import { pageResponseSchema } from "../utils/pagination.js";
+import { registerPublicCache } from "../utils/cache.js";
 
 export const productResponseSchema = {
   type: "object",
@@ -52,6 +54,8 @@ export const errorResponseSchema = {
 };
 
 export default async function productRoutes(fastify: FastifyInstance) {
+  await registerPublicCache(fastify);
+
   fastify.get(
     "/",
     {
@@ -61,7 +65,7 @@ export default async function productRoutes(fastify: FastifyInstance) {
         querystring: {
           type: "object",
           properties: {
-            page: { type: "number" },
+            page: { type: "integer", minimum: 1 },
             limit: { type: "number", minimum: 1, maximum: 100 },
             minPrice: { type: "number" },
             maxPrice: { type: "number" },
@@ -72,9 +76,8 @@ export default async function productRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            description: "Lista de produtos",
-            type: "array",
-            items: productResponseSchema,
+            description: "Produtos ativos, paginados",
+            ...pageResponseSchema(productResponseSchema),
           },
           400: {
             description: "Requisicao invalida",

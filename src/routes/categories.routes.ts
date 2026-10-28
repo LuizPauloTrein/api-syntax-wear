@@ -3,6 +3,8 @@ import {
   getCategory,
   listCategories,
 } from "../controllers/category.controller.js";
+import { pageResponseSchema } from "../utils/pagination.js";
+import { registerPublicCache } from "../utils/cache.js";
 
 export const categoryResponseSchema = {
   type: "object",
@@ -23,17 +25,30 @@ export const errorResponseSchema = {
 };
 
 export default async function categoryRoutes(fastify: FastifyInstance) {
+  await registerPublicCache(fastify);
+
   fastify.get(
     "/",
     {
       schema: {
         tags: ["Categories"],
-        description: "Lista as categorias",
+        description: "Lista as categorias ativas, paginadas",
+        querystring: {
+          type: "object",
+          properties: {
+            page: { type: "integer", minimum: 1 },
+            limit: { type: "integer", minimum: 1, maximum: 100 },
+            search: { type: "string", maxLength: 100 },
+          },
+        },
         response: {
           200: {
-            description: "Lista de categorias",
-            type: "array",
-            items: categoryResponseSchema,
+            description: "Categorias ativas, paginadas",
+            ...pageResponseSchema(categoryResponseSchema),
+          },
+          400: {
+            description: "Filtros inválidos",
+            ...errorResponseSchema,
           },
         },
       },

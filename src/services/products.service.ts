@@ -10,6 +10,23 @@ import {
   ConflictError,
   NotFoundError,
 } from "../errors/app-error.js";
+import { buildPage } from "../utils/pagination.js";
+
+// Só as colunas que a API devolve (nada de SELECT * nas listagens).
+const productSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  description: true,
+  price: true,
+  images: true,
+  sizes: true,
+  stock: true,
+  active: true,
+  createdAt: true,
+  updatedAt: true,
+  categoryId: true,
+} as const;
 
 export const getProducts = async (filter: ProductFilters) => {
   const {
@@ -43,12 +60,18 @@ export const getProducts = async (filter: ProductFilters) => {
       : {}),
   };
 
-  return prisma.product.findMany({
-    where,
-    orderBy: { [sortBy]: sortOrder },
-    skip: (page - 1) * limit,
-    take: limit,
-  });
+  const [total, products] = await prisma.$transaction([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      select: productSelect,
+      orderBy: { [sortBy]: sortOrder },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+
+  return buildPage(products, total, page, limit);
 };
 
 export class ProductNotFoundError extends NotFoundError {
@@ -61,6 +84,7 @@ export class ProductNotFoundError extends NotFoundError {
 export const getProductById = async (id: number) => {
   const product = await prisma.product.findUnique({
     where: { id, active: true },
+    select: productSelect,
   });
 
   if (!product) {
@@ -85,29 +109,35 @@ export class ProductCategoryNotFoundError extends BadRequestError {
 }
 
 export const createProduct = async (data: CreateProduct) => {
-  const existingProduct = await prisma.product.findUnique({
-    where: { slug: data.slug },
-  });
-
-  if (existingProduct) {
-    throw new ProductSlugAlreadyExistsError();
-  }
-
   const existingCategory = await prisma.category.findUnique({
     where: { id: data.categoryId, active: true },
+    select: { id: true },
   });
 
   if (!existingCategory) {
     throw new ProductCategoryNotFoundError();
   }
 
-  const newProduct = await prisma.product.create({ data });
-  return newProduct;
+  // A constraint única do slug decide (sem consulta extra e sem corrida).
+  try {
+    return await prisma.product.create({ data, select: productSelect });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new ProductSlugAlreadyExistsError();
+    }
+
+    throw error;
+  }
 };
+
+const isUniqueViolation = (error: unknown) =>
+  error instanceof Prisma.PrismaClientKnownRequestError &&
+  error.code === "P2002";
 
 export const updateProduct = async (id: number, data: UpdateProduct) => {
   const existingProduct = await prisma.product.findUnique({
     where: { id },
+    select: { id: true },
   });
 
   if (!existingProduct) {
@@ -124,28 +154,25 @@ export const updateProduct = async (id: number, data: UpdateProduct) => {
     }
   }
 
-  if (data.slug) {
-    const slugExists = await prisma.product.findUnique({
-      where: { slug: data.slug },
+  try {
+    return await prisma.product.update({
+      where: { id },
+      data,
+      include: { category: true },
     });
-
-    if (slugExists && slugExists.id !== id) {
+  } catch (error) {
+    if (isUniqueViolation(error)) {
       throw new ProductSlugAlreadyExistsError();
     }
+
+    throw error;
   }
-
-  const updatedProduct = await prisma.product.update({
-    where: { id },
-    data,
-    include: { category: true },
-  });
-
-  return updatedProduct;
 };
 
 export const deleteProduct = async (id: number) => {
   const existingProduct = await prisma.product.findUnique({
     where: { id },
+    select: { id: true },
   });
 
   if (!existingProduct) {

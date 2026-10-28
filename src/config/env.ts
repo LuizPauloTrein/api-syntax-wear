@@ -24,6 +24,15 @@ const envSchema = z.object({
   TRUST_PROXY: z.string().default("false"),
   // /api-docs: ligado fora de produção; em produção só com ENABLE_DOCS=true.
   ENABLE_DOCS: booleanFromString.optional(),
+  // Pool de conexões da API. Com o pooler do Supabase (porta 6543) o limite real
+  // fica no pooler, então mantenha o pool pequeno por instância.
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+  DB_IDLE_TIMEOUT_MS: z.coerce.number().int().min(0).default(30_000),
+  DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(0).default(5_000),
+  // Consulta que passar disso é cancelada pelo Postgres (0 desliga).
+  DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).default(15_000),
+  // Consultas mais lentas que isso são registradas no log (0 desliga).
+  SLOW_QUERY_MS: z.coerce.number().int().min(0).default(500),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
@@ -57,6 +66,13 @@ export const env = {
   isProduction,
   port: data.PORT,
   databaseUrl: data.DATABASE_URL,
+  db: {
+    poolMax: data.DB_POOL_MAX,
+    idleTimeoutMs: data.DB_IDLE_TIMEOUT_MS,
+    connectionTimeoutMs: data.DB_CONNECTION_TIMEOUT_MS,
+    statementTimeoutMs: data.DB_STATEMENT_TIMEOUT_MS,
+    slowQueryMs: data.SLOW_QUERY_MS,
+  },
   jwtSecret: data.JWT_SECRET,
   jwtExpiresIn: data.JWT_EXPIRES_IN,
   corsOrigins:

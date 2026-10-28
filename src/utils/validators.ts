@@ -105,6 +105,17 @@ export const categoryIdSchema = z.object({
   id: z.coerce.number().int().positive("ID de categoria inválido"),
 });
 
+export const categoryFiltersSchema = z.object({
+  page: z.coerce.number().int().positive("Página deve ser um inteiro positivo").optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive("Limite deve ser um inteiro positivo")
+    .max(100, "Limite máximo é 100")
+    .optional(),
+  search: z.string().trim().min(1).max(100).optional(),
+});
+
 export const createCategorySchema = z.object({
   name: z.string().trim().min(1, "Nome é obrigatório"),
   description: z.string().trim().min(1, "Descrição inválida").optional(),

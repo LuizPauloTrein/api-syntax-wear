@@ -6,6 +6,7 @@ import {
   getOrders,
 } from "../services/orders.service.js";
 import { CreateOrder, OrderFilters } from "../types/index.js";
+import { toOrderResponse } from "../utils/mappers.js";
 import {
   createOrderSchema,
   orderFiltersSchema,
@@ -22,7 +23,7 @@ export const createNewOrder = async (
   const data = createOrderSchema.parse(request.body);
 
   const order = await createOrder(getUserId(request), data);
-  reply.status(201).send(order);
+  reply.status(201).send(toOrderResponse(order));
 };
 
 export const listOrders = async (
@@ -31,7 +32,9 @@ export const listOrders = async (
 ) => {
   const filters = orderFiltersSchema.parse(request.query);
   const orders = await getOrders(getUserId(request), filters);
-  reply.status(200).send(orders);
+  reply
+    .status(200)
+    .send({ ...orders, data: orders.data.map(toOrderResponse) });
 };
 
 export const getOrder = async (
@@ -41,7 +44,7 @@ export const getOrder = async (
   const { id } = orderIdSchema.parse(request.params);
 
   const order = await getOrderById(id, getUserId(request));
-  reply.status(200).send(order);
+  reply.status(200).send(toOrderResponse(order));
 };
 
 export const deleteExistingOrder = async (

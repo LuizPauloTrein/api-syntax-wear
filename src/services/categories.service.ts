@@ -1,9 +1,12 @@
 import { prisma } from "../utils/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
-import { CreateCategory, UpdateCategory } from "../types/index.js";
+import {
+  CategoryFilters,
+  CreateCategory,
+  UpdateCategory,
+} from "../types/index.js";
+import { buildPage } from "../utils/pagination.js";
 import { ConflictError, NotFoundError } from "../errors/app-error.js";
-
-const CATEGORY_PRODUCTS_LIMIT = 100;
 
 export class CategoryNotFoundError extends NotFoundError {
   constructor() {
@@ -112,23 +115,31 @@ export const deleteCategory = async (id: number) => {
   });
 };
 
-export const getCategories = async () => {
-  return prisma.category.findMany({
-    where: { active: true },
-  });
+export const getCategories = async (filters: CategoryFilters = {}) => {
+  const { page = 1, limit = 50, search } = filters;
+
+  const where: Prisma.CategoryWhereInput = {
+    active: true,
+    ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
+  };
+
+  const [total, categories] = await prisma.$transaction([
+    prisma.category.count({ where }),
+    prisma.category.findMany({
+      where,
+      orderBy: { id: "asc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+
+  return buildPage(categories, total, page, limit);
 };
 
 export const getCategoryById = async (id: number) => {
+  // A resposta não inclui produtos (eles têm rota própria), então não os lemos.
   const category = await prisma.category.findUnique({
     where: { id, active: true },
-    include: {
-      // Só produtos ativos e com teto, para a resposta não crescer sem limite.
-      products: {
-        where: { active: true },
-        orderBy: { id: "asc" },
-        take: CATEGORY_PRODUCTS_LIMIT,
-      },
-    },
   });
 
   if (!category) {

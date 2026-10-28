@@ -6,6 +6,7 @@ import {
   ConflictError,
   NotFoundError,
 } from "../errors/app-error.js";
+import { buildPage } from "../utils/pagination.js";
 
 export class OrderNotFoundError extends NotFoundError {
   constructor() {
@@ -45,6 +46,33 @@ export class OrderNotCancelableError extends ConflictError {
     this.name = "OrderNotCancelableError";
   }
 }
+
+// Só as colunas que a API devolve; os itens vêm ordenados e sem excesso.
+const orderSelect = {
+  id: true,
+  userId: true,
+  status: true,
+  subtotal: true,
+  shippingCost: true,
+  total: true,
+  shippingAddress: true,
+  paymentMethod: true,
+  createdAt: true,
+  updatedAt: true,
+  canceledAt: true,
+  items: {
+    select: {
+      id: true,
+      orderId: true,
+      productId: true,
+      productName: true,
+      price: true,
+      quantity: true,
+      size: true,
+    },
+    orderBy: { id: "asc" },
+  },
+} as const;
 
 // Frete fixo até existir o cálculo por CEP (/shipping/calc).
 const SHIPPING_COST = 0;
@@ -147,7 +175,7 @@ export const createOrder = async (userId: number, data: CreateOrder) => {
         paymentMethod: data.paymentMethod,
         items: { create: orderItems },
       },
-      include: { items: true },
+      select: orderSelect,
     });
   });
 };
@@ -160,13 +188,18 @@ export const getOrders = async (userId: number, filters: OrderFilters) => {
     ...(status ? { status } : {}),
   };
 
-  return prisma.order.findMany({
-    where,
-    include: { items: true },
-    orderBy: { createdAt: "desc" },
-    skip: (page - 1) * limit,
-    take: limit,
-  });
+  const [total, orders] = await prisma.$transaction([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      select: orderSelect,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+
+  return buildPage(orders, total, page, limit);
 };
 
 export const getOrderById = async (id: number, userId: number) => {
@@ -174,7 +207,7 @@ export const getOrderById = async (id: number, userId: number) => {
   // responder igual a um pedido inexistente, sem revelar que o ID existe.
   const order = await prisma.order.findFirst({
     where: { id, userId },
-    include: { items: true },
+    select: orderSelect,
   });
 
   if (!order) {

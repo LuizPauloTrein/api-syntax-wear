@@ -14,6 +14,7 @@ import {
   updateProductSchema,
 } from "../utils/validators.js";
 import slugify from "slugify";
+import { toProductResponse } from "../utils/mappers.js";
 
 export const listProducts = async (
   request: FastifyRequest<{ Querystring: ProductFilters }>,
@@ -21,7 +22,9 @@ export const listProducts = async (
 ) => {
   const filters = productFiltersSchema.parse(request.query);
   const result = await getProducts(filters as ProductFilters);
-  reply.status(200).send(result);
+  reply
+    .status(200)
+    .send({ ...result, data: result.data.map(toProductResponse) });
 };
 
 export const getProduct = async (
@@ -29,7 +32,7 @@ export const getProduct = async (
   reply: FastifyReply,
 ) => {
   const product = await getProductById(request.params.id);
-  reply.status(200).send(product);
+  reply.status(200).send(toProductResponse(product));
 };
 
 export const createNewProduct = async (
@@ -72,7 +75,7 @@ export const updateExistingProduct = async (
   }
 
   const product = await updateProduct(Number(id), validate);
-  reply.status(200).send(product);
+  reply.status(200).send(toProductResponse(product));
 };
 
 export const deleteExistingProduct = async (

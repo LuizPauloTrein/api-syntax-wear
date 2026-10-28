@@ -7,6 +7,7 @@ import {
 } from "../controllers/order.controller.js";
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { rateLimits } from "../config/rate-limits.js";
+import { pageResponseSchema } from "../utils/pagination.js";
 
 const orderStatusEnum = ["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELED"];
 
@@ -160,9 +161,8 @@ export default async function orderRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            description: "Lista de pedidos do usuário",
-            type: "array",
-            items: orderResponseSchema,
+            description: "Pedidos do usuário, paginados",
+            ...pageResponseSchema(orderResponseSchema),
           },
           400: {
             description: "Filtros inválidos",
