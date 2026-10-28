@@ -1,186 +1,145 @@
-import { prisma } from "../utils/prisma.js";
-import { Prisma } from "../generated/prisma/client.js";
-import {
-  CreateProduct,
-  ProductFilters,
-  UpdateProduct,
-} from "../types/index.js";
-import {
-  BadRequestError,
-  ConflictError,
-  NotFoundError,
-} from "../errors/app-error.js";
-import { buildPage } from "../utils/pagination.js";
-
-// Só as colunas que a API devolve (nada de SELECT * nas listagens).
-const productSelect = {
-  id: true,
-  name: true,
-  slug: true,
-  description: true,
-  price: true,
-  images: true,
-  sizes: true,
-  stock: true,
-  active: true,
-  createdAt: true,
-  updatedAt: true,
-  categoryId: true,
-} as const;
+import { prisma } from "../utils/prisma";
+import { CreateProduct, ProductFilters, UpdateProduct } from "../types";
 
 export const getProducts = async (filter: ProductFilters) => {
-  const {
-    page = 1,
-    limit = 10,
-    minPrice,
-    maxPrice,
-    search,
-    sortBy = "createdAt",
-    sortOrder = "desc",
-  } = filter;
+	const { minPrice, maxPrice, search, categoryId, sortBy, sortOrder, page = 1, limit = 10 } = filter;
 
-  // Rotas públicas só enxergam produtos ativos (os inativos foram "excluídos").
-  const where: Prisma.ProductWhereInput = {
-    active: true,
-    ...(minPrice !== undefined || maxPrice !== undefined
-      ? {
-          price: {
-            ...(minPrice !== undefined ? { gte: minPrice } : {}),
-            ...(maxPrice !== undefined ? { lte: maxPrice } : {}),
-          },
-        }
-      : {}),
-    ...(search
-      ? {
-          OR: [
-            { name: { contains: search, mode: "insensitive" } },
-            { description: { contains: search, mode: "insensitive" } },
-          ],
-        }
-      : {}),
-  };
+	const where: any = {};
 
-  const [total, products] = await prisma.$transaction([
-    prisma.product.count({ where }),
-    prisma.product.findMany({
-      where,
-      select: productSelect,
-      orderBy: { [sortBy]: sortOrder },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-  ]);
+	// Filtro por categoria
+	if (categoryId) {
+		where.categoryId = categoryId;
+	}
 
-  return buildPage(products, total, page, limit);
+	// Filtro por preço
+	if (minPrice !== undefined || maxPrice !== undefined) {
+		where.price = {};
+		if (minPrice !== undefined) {
+			where.price.gte = Number(minPrice);
+		}
+		if (maxPrice !== undefined) {
+			where.price.lte = Number(maxPrice);
+		}
+	}
+
+	// Filtro por busca (name e description)
+	if (search && search.trim()) {
+		where.OR = [
+			{
+				name: {
+					contains: search,
+					mode: "insensitive",
+				},
+			},
+			{
+				description: {
+					contains: search,
+					mode: "insensitive",
+				},
+			},
+		];
+	}
+
+	// Paginação
+	const skip = (Number(page) - 1) * Number(limit);
+	const take = Number(limit);
+
+	// Ordenação
+	const orderBy: any = {};
+	if (sortBy) {
+		orderBy[sortBy] = sortOrder || "asc";
+	}
+
+	try {
+		// Buscar produtos com filtros
+		const [products, total] = await Promise.all([
+			prisma.product.findMany({
+				where,
+				orderBy: Object.keys(orderBy).length > 0 ? orderBy : undefined,
+				skip,
+				take,
+			}),
+			prisma.product.count({ where }),
+		]);
+
+		return {
+			data: products,
+			total,
+			page,
+			limit,
+			totalPages: Math.ceil(total / limit),
+		};
+	} catch (error) {
+		console.error("Erro ao buscar produtos:", error);
+		throw error;
+	}
 };
-
-export class ProductNotFoundError extends NotFoundError {
-  constructor() {
-    super("Produto não encontrado");
-    this.name = "ProductNotFoundError";
-  }
-}
 
 export const getProductById = async (id: number) => {
-  const product = await prisma.product.findUnique({
-    where: { id, active: true },
-    select: productSelect,
-  });
+	const product = await prisma.product.findUnique({
+		where: { id },
+		include:{
+			category: true,
+		}
+	});
 
-  if (!product) {
-    throw new ProductNotFoundError();
-  }
+	if (!product) {
+		throw new Error("Produto não encontrado");
+	}
 
-  return product;
+	return product;
 };
-
-export class ProductSlugAlreadyExistsError extends ConflictError {
-  constructor() {
-    super("Slug já existe, escolha outro nome para o produto");
-    this.name = "ProductSlugAlreadyExistsError";
-  }
-}
-
-export class ProductCategoryNotFoundError extends BadRequestError {
-  constructor() {
-    super("Categoria não encontrada");
-    this.name = "ProductCategoryNotFoundError";
-  }
-}
 
 export const createProduct = async (data: CreateProduct) => {
-  const existingCategory = await prisma.category.findUnique({
-    where: { id: data.categoryId, active: true },
-    select: { id: true },
-  });
+	const existingProduct = await prisma.product.findUnique({
+		where: { slug: data.slug },
+	});
 
-  if (!existingCategory) {
-    throw new ProductCategoryNotFoundError();
-  }
+	if (existingProduct) {
+		throw new Error("Slug já existe. Escolha outro nome para o produto.");
+	}
 
-  // A constraint única do slug decide (sem consulta extra e sem corrida).
-  try {
-    return await prisma.product.create({ data, select: productSelect });
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      throw new ProductSlugAlreadyExistsError();
-    }
-
-    throw error;
-  }
+	const newProduct = await prisma.product.create({ data });
+	return newProduct;
 };
-
-const isUniqueViolation = (error: unknown) =>
-  error instanceof Prisma.PrismaClientKnownRequestError &&
-  error.code === "P2002";
-
 export const updateProduct = async (id: number, data: UpdateProduct) => {
-  const existingProduct = await prisma.product.findUnique({
-    where: { id },
-    select: { id: true },
-  });
+	const existingProduct = await prisma.product.findUnique({
+		where: { id },
+	});
 
-  if (!existingProduct) {
-    throw new ProductNotFoundError();
-  }
+	if (!existingProduct) {
+		throw new Error("Produto não encontrado");
+	}
 
-  if (data.categoryId !== undefined) {
-    const existingCategory = await prisma.category.findUnique({
-      where: { id: data.categoryId, active: true },
-    });
+	if (data.slug) {
+		const slugExists = await prisma.product.findUnique({
+			where: { slug: data.slug },
+		});
 
-    if (!existingCategory) {
-      throw new ProductCategoryNotFoundError();
-    }
-  }
+		if (slugExists && slugExists.id !== id) {
+			throw new Error("Slug já existe. Escolha outro nome para o produto.");
+		}
+	}
 
-  try {
-    return await prisma.product.update({
-      where: { id },
-      data,
-      include: { category: true },
-    });
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      throw new ProductSlugAlreadyExistsError();
-    }
+	const updatedProduct = await prisma.product.update({
+		where: { id },
+		data,
+	});
 
-    throw error;
-  }
+	return updatedProduct;
 };
 
 export const deleteProduct = async (id: number) => {
-  const existingProduct = await prisma.product.findUnique({
-    where: { id },
-    select: { id: true },
-  });
+	const existingProduct = await prisma.product.findUnique({
+		where: { id },
+	});
 
-  if (!existingProduct) {
-    throw new ProductNotFoundError();
-  }
+	if(!existingProduct) {
+		throw new Error("Produto não encontrado");
+	}
 
-  await prisma.product.update({
-    where: { id },
-    data: { active: false },
-  });
+	await prisma.product.update({
+		where: { id },
+		data: { active: false },
+	});
 };

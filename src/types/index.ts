@@ -1,109 +1,104 @@
-export interface ProductFilters {
-  page?: number;
-  limit?: number;
-  minPrice?: number;
-  maxPrice?: number;
-  search?: string;
-  categoryId?: number;
-  sortBy?: "price" | "name" | "createdAt";
-  sortOrder?: "asc" | "desc";
-}
-
-export type OrderStatusValue =
-  | "PENDING"
-  | "PAID"
-  | "SHIPPED"
-  | "DELIVERED"
-  | "CANCELED";
-
-// `type` (e não `interface`) para ser atribuível ao tipo Json do Prisma,
-// que exige assinatura de índice.
-export type ShippingAddress = {
-  cep: string;
-  street: string;
-  number: string;
-  complement?: string;
-  neighborhood: string;
-  city: string;
-  state: string;
-  country: string;
-};
-
-export type PaymentMethod = "PIX" | "CREDIT_CARD" | "BOLETO";
-
-export interface CreateOrderItem {
-  productId: number;
-  quantity: number;
-  size?: string;
-}
-
-export interface CreateOrder {
-  items: CreateOrderItem[];
-  shippingAddress: ShippingAddress;
-  paymentMethod: PaymentMethod;
-}
-
-export interface OrderFilters {
-  page?: number;
-  limit?: number;
-  status?: OrderStatusValue;
+export interface ProductFilters{
+    page?: number;
+    limit?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    search?: string;
+    categoryId?: number;
+    sortBy: 'price' | 'name' | 'createdAt';
+    sortOrder: 'asc' | 'desc';
 }
 
 export interface CategoryFilters {
-  page?: number;
-  limit?: number;
-  search?: string;
+    page?: number;
+    limit?: number;
+    search?: string;
 }
 
 export interface CreateCategory {
-  name: string;
-  slug: string;
-  description?: string;
+    name: string;
+    description?: string;
+    slug: string;
+    active: boolean;
 }
 
 export interface UpdateCategory {
-  name?: string;
-  slug?: string;
-  description?: string | null;
+    name?: string;
+    description?: string;
+    slug?: string;
+    active?: boolean;
 }
 
 export interface AuthRequest {
-  email: string;
-  password: string;
+    email: string;
+    password: string;
 }
 
 export interface RegisterRequest extends AuthRequest {
-  firstName: string;
-  lastName: string;
-  cpf?: string;
-  dateBirth?: string;
-  phone?: string;
+    firstName: string;
+    lastName: string;
+    cpf?: string;
+    dateOfBirth?: string;
+    phone?: string;
 }
 
-// Dados já validados e normalizados pelo registerSchema (data como Date, CPF e
-// telefone só com dígitos).
-export type RegisterData = Omit<RegisterRequest, "dateBirth"> & {
-  dateBirth?: Date;
-};
-
 export interface CreateProduct {
-  name: string;
-  description: string;
-  price: number;
-  categoryId: number;
-  colors?: string[];
-  sizes?: string[];
-  slug: string;
-  stock: number;
-  active: boolean;
-  imgaes?: string[];
+    name: string;
+    description: string;
+    price: number;
+    colors?: string[];
+    sizes?: string[];
+    slug: string;
+    stock: number;
+    active: boolean;
+    images?: string[];
+    categoryId: number;
 }
 
 export interface UpdateProduct extends Partial<CreateProduct> {
-  name?: string;
-  description?: string;
-  price?: number;
-  slug?: string;
-  stock?: number;
-  active?: boolean;
+    name?: string;
+    description?: string;
+    price?: number;
+    slug?: string;
+    stock?: number;
+    active?: boolean;
+}
+
+// Order types
+export interface OrderFilters {
+    page?: number;
+    limit?: number;
+    status?: 'PENDING' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+    userId?: number;
+    startDate?: string;
+    endDate?: string;
+}
+
+export interface ShippingAddress {
+    cep: string;
+    street: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    country: string;
+}
+
+export interface CreateOrderItem {
+    productId: number;
+    quantity: number;
+    size?: string;
+}
+
+export interface CreateOrder {
+    userId?: number;
+    items: CreateOrderItem[];
+    shippingAddress: ShippingAddress;
+    paymentMethod: string;
+}
+
+export interface UpdateOrder {
+    status?: 'PENDING' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+    shippingAddress?: ShippingAddress;
 }

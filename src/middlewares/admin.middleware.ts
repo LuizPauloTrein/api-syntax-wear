@@ -1,54 +1,36 @@
-import { FastifyReply, FastifyRequest } from "fastify";
-import { prisma } from "../utils/prisma.js";
+import { FastifyRequest, FastifyReply } from "fastify";
+import { prisma } from "../utils/prisma";
 
-// Cache curto da role: rotas administrativas deixam de consultar o banco a cada
-// requisição. Rebaixar um admin vale em até ROLE_CACHE_TTL_MS.
-const ROLE_CACHE_TTL_MS = 30_000;
-const ROLE_CACHE_MAX_ENTRIES = 1_000;
-const roleCache = new Map<number, { role: string | null; expiresAt: number }>();
+export const requireAdmin = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+	try {
+		// Primeiro verifica se o token JWT é válido
+		await request.jwtVerify();
 
-export const clearRoleCache = () => roleCache.clear();
+		// Extrai o userId do token
+		const userId = (request.user as any).userId;
 
-const getRole = async (userId: number) => {
-  const now = Date.now();
-  const cached = roleCache.get(userId);
+		if (!userId) {
+			return reply.status(401).send({ message: "Token inválido. ID do usuário não encontrado." });
+		}
 
-  if (cached && cached.expiresAt > now) {
-    return cached.role;
-  }
+		// Busca o usuário no banco de dados
+		const user = await prisma.user.findUnique({
+			where: { id: userId },
+			select: { id: true, role: true },
+		});
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { role: true },
-  });
+		// Verifica se o usuário existe
+		if (!user) {
+			return reply.status(401).send({ message: "Usuário não encontrado." });
+		}
 
-  if (roleCache.size >= ROLE_CACHE_MAX_ENTRIES) {
-    roleCache.clear();
-  }
+		// Verifica se o usuário tem role ADMIN
+		if (user.role !== "ADMIN") {
+			return reply.status(403).send({ message: "Acesso negado. Requer permissão de administrador." });
+		}
 
-  roleCache.set(userId, {
-    role: user?.role ?? null,
-    expiresAt: now + ROLE_CACHE_TTL_MS,
-  });
-
-  return user?.role ?? null;
-};
-
-// Deve rodar depois de `authenticate`: o JWT só carrega { userId }, então a
-// role vem do banco (com o cache curto acima).
-export const requireAdmin = async (
-  request: FastifyRequest,
-  reply: FastifyReply,
-): Promise<void> => {
-  if (reply.sent) {
-    return;
-  }
-
-  const { userId } = request.user as { userId?: number };
-
-  const role = typeof userId === "number" ? await getRole(userId) : null;
-
-  if (role !== "ADMIN") {
-    reply.status(403).send({ message: "Acesso restrito a administradores" });
-  }
+		// Se passou por todas as verificações, permite continuar
+	} catch (err) {
+		return reply.status(401).send({ message: "Token inválido ou expirado." });
+	}
 };

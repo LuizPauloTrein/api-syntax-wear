@@ -1,11 +1,13 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
+
+// Models based on PRD (users and products)
 
 model User {
   id        Int       @id @default(autoincrement())
@@ -26,25 +28,12 @@ enum Role {
   ADMIN
 }
 
-model Product {
-  id          Int      @id @default(autoincrement())
-  name        String
-  slug        String   @unique
-  description String?
-  price       Decimal
-  images      Json?
-  sizes       Json?
-  stock       Int      @default(0)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  categoryId  Int?
-  category    Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  orderItems  OrderItem[]
-
-  @@index([categoryId])
-  // Listagem pública: filtra por active e ordena por createdAt.
-  @@index([active, createdAt])
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
 }
 
 model Category {
@@ -53,50 +42,50 @@ model Category {
   slug        String    @unique
   description String?
   active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   products    Product[]
-
-  @@index([active])
 }
 
-enum OrderStatus {
-  PENDING
-  PAID
-  SHIPPED
-  DELIVERED
-  CANCELED
+model Product {
+  id          Int         @id @default(autoincrement())
+  name        String
+  slug        String      @unique
+  description String?
+  price       Decimal
+  colors      Json?
+  images      Json?
+  sizes       Json?
+  stock       Int         @default(0)
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  category    Category    @relation(fields: [categoryId], references: [id])
+  categoryId  Int
+  orderItems  OrderItem[]
 }
 
 model Order {
   id              Int         @id @default(autoincrement())
-  userId          Int
-  user            User        @relation(fields: [userId], references: [id], onDelete: Restrict)
-  status          OrderStatus @default(PENDING)
-  subtotal        Decimal
-  shippingCost    Decimal     @default(0)
+  userId          Int?
+  user            User?       @relation(fields: [userId], references: [id])
   total           Decimal
+  status          OrderStatus @default(PENDING)
   shippingAddress Json
   paymentMethod   String
-  items           OrderItem[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
-  canceledAt      DateTime?
-
-  // "Meus pedidos" (por usuário, mais recentes primeiro) e filtro por status.
-  @@index([userId, createdAt])
-  @@index([status, createdAt])
+  items           OrderItem[]
 }
 
 model OrderItem {
-  id          Int     @id @default(autoincrement())
-  orderId     Int
-  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId   Int
-  product     Product @relation(fields: [productId], references: [id], onDelete: Restrict)
-  productName String
-  price       Decimal
-  quantity    Int
-  size        String?
-
-  @@index([orderId])
-  @@index([productId])
+  id        Int      @id @default(autoincrement())
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+  price     Decimal
+  quantity  Int
+  size      String?
+  createdAt DateTime @default(now())
 }
