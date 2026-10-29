@@ -9,7 +9,6 @@ import productRoutes from "./routes/products.routes";
 import categoryRoutes from "./routes/categories.routes";
 import orderRoutes from "./routes/orders.routes";
 import swagger from "@fastify/swagger";
-import scalar from "@scalar/fastify-api-reference";
 import jwt from "@fastify/jwt";
 import authRoutes from "./routes/auth.routes";
 import z, { ZodError } from "zod";
@@ -24,7 +23,9 @@ const isProduction = process.env.NODE_ENV === "production";
 const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error("JWT_SECRET ausente ou curto demais: defina um segredo aleatório com pelo menos 32 caracteres no .env");
+  throw new Error(
+    "JWT_SECRET ausente ou curto demais: defina um segredo aleatório com pelo menos 32 caracteres no .env",
+  );
 }
 
 // CORS: só as origens listadas em CORS_ORIGINS (separadas por vírgula).
@@ -34,11 +35,16 @@ const corsOrigins = (process.env.CORS_ORIGINS ?? "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-const allowedOrigins = corsOrigins.length > 0 ? corsOrigins : isProduction ? false : ["http://localhost:5173", "http://localhost:3000"];
+const allowedOrigins =
+  corsOrigins.length > 0
+    ? corsOrigins
+    : isProduction
+      ? false
+      : ["http://localhost:5173", "http://localhost:3000"];
 
 const fastify = Fastify({
   logger: {
-    level: process.env.LOG_LEVEL || 'info',
+    level: process.env.LOG_LEVEL || "info",
     serializers: {
       req(request) {
         return {
@@ -51,9 +57,9 @@ const fastify = Fastify({
         return {
           statusCode: reply.statusCode,
         };
-      }
-    }
-  }
+      },
+    },
+  },
 });
 
 fastify.register(jwt, {
@@ -98,11 +104,14 @@ fastify.register(swagger, {
   },
 });
 
-fastify.register(scalar, {
-  routePrefix: "/api-docs",
-  configuration: {
-    theme: "default",
-  },
+fastify.register(async (instance) => {
+  const { default: scalar } = await import("@scalar/fastify-api-reference");
+  await instance.register(scalar, {
+    routePrefix: "/api-docs",
+    configuration: {
+      theme: "default",
+    },
+  });
 });
 
 fastify.register(productRoutes, { prefix: "/products" });
