@@ -70,11 +70,12 @@ export interface OrderFilters {
     limit?: number;
     status?: 'PENDING' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
     userId?: number;
-    startDate?: string;
-    endDate?: string;
+    startDate?: Date;
+    endDate?: Date;
 }
 
-export interface ShippingAddress {
+// `type` (e não `interface`) para ser atribuível ao tipo Json do Prisma.
+export type ShippingAddress = {
     cep: string;
     street: string;
     number: string;
@@ -85,6 +86,8 @@ export interface ShippingAddress {
     country: string;
 }
 
+export type PaymentMethod = 'credit_card' | 'pix' | 'boleto';
+
 export interface CreateOrderItem {
     productId: number;
     quantity: number;
@@ -92,10 +95,9 @@ export interface CreateOrderItem {
 }
 
 export interface CreateOrder {
-    userId?: number;
     items: CreateOrderItem[];
     shippingAddress: ShippingAddress;
-    paymentMethod: string;
+    paymentMethod: PaymentMethod;
 }
 
 export interface UpdateOrder {

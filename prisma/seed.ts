@@ -168,6 +168,12 @@ const products = [
 ]
 
 async function main() {
+  // O seed apaga TODAS as tabelas (inclusive usuários) e cria um admin com
+  // senha conhecida: nunca pode rodar em produção.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('O seed não pode rodar com NODE_ENV=production (apaga todos os dados e cria um admin com senha conhecida).')
+  }
+
   try {
     // Limpar dados existentes (em ordem devido às FKs)
     await prisma.orderItem.deleteMany({})

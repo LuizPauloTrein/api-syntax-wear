@@ -1,12 +1,61 @@
+import { OrderStatus, Prisma } from '@prisma/client'
 import { OrderFilters, CreateOrder, UpdateOrder } from '../types'
 import { prisma } from '../utils/prisma'
+import { HttpError } from '../utils/http-error'
+
+// Transições de status permitidas (só administradores mudam o status).
+const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  PENDING: ['PAID', 'CANCELLED'],
+  PAID: ['SHIPPED', 'CANCELLED'],
+  SHIPPED: ['DELIVERED'],
+  DELIVERED: [],
+  CANCELLED: [],
+}
+
+// Só pedidos ainda não enviados podem ser cancelados (e o estoque volta).
+const CANCELABLE_STATUSES: OrderStatus[] = ['PENDING', 'PAID']
+
+// Endereço só pode mudar enquanto o pedido não foi enviado.
+const ADDRESS_EDITABLE_STATUSES: OrderStatus[] = ['PENDING', 'PAID']
+
+// Só o necessário do dono do pedido (sem CPF nem telefone).
+const orderUserSelect = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+} as const
+
+const orderItemsInclude = {
+  select: {
+    id: true,
+    productId: true,
+    price: true,
+    quantity: true,
+    size: true,
+    product: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        images: true,
+        category: { select: { id: true, name: true, slug: true } },
+      },
+    },
+  },
+} as const
+
+const orderInclude = {
+  user: { select: orderUserSelect },
+  items: orderItemsInclude,
+} as const
 
 export async function getOrders(filters: OrderFilters = {}, requestingUserId: number, isAdmin: boolean) {
   const page = filters.page || 1
   const limit = filters.limit || 10
   const skip = (page - 1) * limit
 
-  const where: any = {}
+  const where: Prisma.OrderWhereInput = {}
 
   // Se não é admin, forçar filtro por userId do usuário autenticado
   if (!isAdmin) {
@@ -50,236 +99,203 @@ export async function getOrders(filters: OrderFilters = {}, requestingUserId: nu
 }
 
 export async function getOrderById(id: number, requestingUserId: number, isAdmin: boolean) {
-  const order = await prisma.order.findUnique({
-    where: { id },
-    include: {
-      user: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          cpf: true,
-          phone: true,
-        },
-      },
-      items: {
-        include: {
-          product: {
-            include: {
-              category: true,
-            },
-          },
-        },
-      },
-    },
+  // Filtrar por dono na própria consulta: o pedido de outro usuário responde
+  // igual a um pedido inexistente, sem revelar que o ID existe.
+  const order = await prisma.order.findFirst({
+    where: isAdmin ? { id } : { id, userId: requestingUserId },
+    include: orderInclude,
   })
 
   if (!order) {
-    throw new Error('Pedido não encontrado')
-  }
-
-  // Verificar se o usuário pode acessar o pedido
-  if (!isAdmin && order.userId !== requestingUserId) {
-    throw new Error('Você não tem permissão para acessar este pedido')
+    throw new HttpError(404, 'Pedido não encontrado')
   }
 
   return order
 }
 
-export async function createOrder(data: CreateOrder) {
-  // 1. Buscar todos os produtos para validação
-  const productIds = data.items.map(item => item.productId)
-  const products = await prisma.product.findMany({
-    where: { id: { in: productIds } },
-    include: { category: true },
-  })
-
-  // 2. Validar que todos os produtos existem
-  if (products.length !== productIds.length) {
-    const foundIds = products.map(p => p.id)
-    const missingIds = productIds.filter(id => !foundIds.includes(id))
-    throw new Error(`Produto(s) com ID ${missingIds.join(', ')} não encontrado(s)`)
-  }
-
-  // 3. Criar mapa de produtos para acesso rápido
-  const productMap = new Map(products.map(p => [p.id, p]))
-
-  // 4. Validações e cálculo de total
-  let calculatedTotal = 0
+// O dono do pedido é sempre o usuário autenticado (userId vem do token, nunca
+// do corpo da requisição).
+export async function createOrder(userId: number, data: CreateOrder) {
+  // Agrupa itens repetidos (mesmo produto e tamanho), somando as quantidades.
+  const grouped = new Map<string, { productId: number; size: string | null; quantity: number }>()
 
   for (const item of data.items) {
-    const product = productMap.get(item.productId)!
+    const size = item.size ?? null
+    const key = `${item.productId}:${size ?? ''}`
+    const current = grouped.get(key)
 
-    // Verificar se produto está ativo
-    if (!product.active) {
-      throw new Error(`Produto ${product.name} está inativo`)
+    if (current) {
+      current.quantity += item.quantity
+    } else {
+      grouped.set(key, { productId: item.productId, size, quantity: item.quantity })
     }
-
-    // Verificar estoque disponível
-    if (product.stock < item.quantity) {
-      throw new Error(
-        `Estoque insuficiente para ${product.name}. Disponível: ${product.stock}, solicitado: ${item.quantity}`
-      )
-    }
-
-    // Verificar se produto tem sizes e se size foi informado
-    const productSizes = (product.sizes as any) || []
-    if (productSizes.length > 0) {
-      if (!item.size) {
-        throw new Error(`Produto ${product.name} requer seleção de tamanho`)
-      }
-      if (!productSizes.includes(item.size)) {
-        throw new Error(`Tamanho ${item.size} não disponível para ${product.name}`)
-      }
-    }
-
-    // Calcular total (usar preço atual do produto como snapshot)
-    calculatedTotal += Number(product.price) * item.quantity
   }
 
-  // 5. Criar pedido com transação atômica
-  const order = await prisma.$transaction(async (tx) => {
-    // 5.1 Criar Order
-    const newOrder = await tx.order.create({
+  // Ordem fixa por produto: pedidos concorrentes travam as linhas na mesma
+  // ordem e não entram em deadlock.
+  const items = [...grouped.values()].sort((a, b) => a.productId - b.productId || (a.size ?? '').localeCompare(b.size ?? ''))
+  const productIds = [...new Set(items.map((item) => item.productId))]
+
+  return prisma.$transaction(async (tx) => {
+    const products = await tx.product.findMany({ where: { id: { in: productIds } } })
+    const productMap = new Map(products.map((product) => [product.id, product]))
+
+    let total = new Prisma.Decimal(0)
+    const orderItems: { productId: number; price: Prisma.Decimal; quantity: number; size: string | null }[] = []
+
+    for (const item of items) {
+      const product = productMap.get(item.productId)
+
+      if (!product) {
+        throw new HttpError(404, `Produto ${item.productId} não encontrado`)
+      }
+
+      if (!product.active) {
+        throw new HttpError(400, `Produto ${product.name} está inativo`)
+      }
+
+      // Produto com tamanhos exige um deles.
+      const productSizes = Array.isArray(product.sizes) ? (product.sizes as unknown[]) : []
+
+      if (productSizes.length > 0) {
+        if (!item.size) {
+          throw new HttpError(400, `Produto ${product.name} requer seleção de tamanho`)
+        }
+        if (!productSizes.includes(item.size)) {
+          throw new HttpError(400, `Tamanho ${item.size} não disponível para ${product.name}`)
+        }
+      }
+
+      // Decremento atômico: só passa se ainda houver estoque suficiente, mesmo
+      // com várias compras simultâneas do mesmo produto.
+      const reserved = await tx.product.updateMany({
+        where: { id: product.id, active: true, stock: { gte: item.quantity } },
+        data: { stock: { decrement: item.quantity } },
+      })
+
+      if (reserved.count === 0) {
+        throw new HttpError(409, `Estoque insuficiente para ${product.name}`)
+      }
+
+      // Preço atual do produto como snapshot (nunca o preço enviado pelo cliente).
+      total = total.add(product.price.mul(item.quantity))
+
+      orderItems.push({
+        productId: product.id,
+        price: product.price,
+        quantity: item.quantity,
+        size: item.size,
+      })
+    }
+
+    return tx.order.create({
       data: {
-        userId: data.userId,
-        total: calculatedTotal,
+        userId,
+        total,
         status: 'PENDING',
-        shippingAddress: data.shippingAddress as any,
+        shippingAddress: data.shippingAddress as Prisma.InputJsonObject,
         paymentMethod: data.paymentMethod,
+        items: { create: orderItems },
       },
     })
-
-    // 5.2 Criar OrderItems com snapshot de preço
-    await Promise.all(
-      data.items.map(item => {
-        const product = productMap.get(item.productId)!
-        return tx.orderItem.create({
-          data: {
-            orderId: newOrder.id,
-            productId: item.productId,
-            price: product.price,
-            quantity: item.quantity,
-            size: item.size,
-          },
-        })
-      })
-    )
-
-    // 5.3 Decrementar estoque de cada produto
-    await Promise.all(
-      data.items.map(item =>
-        tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } },
-        })
-      )
-    )
-
-    return newOrder
   })
+}
 
-  return order
+// Devolve ao estoque os itens de um pedido cancelado, somando por produto e
+// em ordem fixa (evita deadlock).
+async function restoreStock(tx: Prisma.TransactionClient, orderId: number) {
+  const items = await tx.orderItem.findMany({ where: { orderId } })
+  const toRestore = new Map<number, number>()
+
+  for (const item of items) {
+    toRestore.set(item.productId, (toRestore.get(item.productId) ?? 0) + item.quantity)
+  }
+
+  for (const [productId, quantity] of [...toRestore].sort((a, b) => a[0] - b[0])) {
+    await tx.product.update({
+      where: { id: productId },
+      data: { stock: { increment: quantity } },
+    })
+  }
 }
 
 export async function updateOrder(id: number, data: UpdateOrder, requestingUserId: number, isAdmin: boolean) {
-  // Verificar se pedido existe
-  const existingOrder = await prisma.order.findUnique({
-    where: { id },
-  })
-
-  if (!existingOrder) {
-    throw new Error('Pedido não encontrado')
+  // Cliente comum não muda status (senão marcaria o próprio pedido como PAID).
+  if (data.status !== undefined && !isAdmin) {
+    throw new HttpError(403, 'Apenas administradores podem alterar o status do pedido')
   }
 
-  // Verificar se o usuário pode atualizar o pedido
-  if (!isAdmin && existingOrder.userId !== requestingUserId) {
-    throw new Error('Você não tem permissão para atualizar este pedido')
-  }
+  await prisma.$transaction(async (tx) => {
+    const existingOrder = await tx.order.findFirst({
+      where: isAdmin ? { id } : { id, userId: requestingUserId },
+    })
 
-  // Atualizar pedido
-  const updatedOrder = await prisma.order.update({
-    where: { id },
-    data: {
-      status: data.status,
-      shippingAddress: data.shippingAddress as any,
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          cpf: true,
-          phone: true,
-        },
+    if (!existingOrder) {
+      throw new HttpError(404, 'Pedido não encontrado')
+    }
+
+    if (data.shippingAddress && !ADDRESS_EDITABLE_STATUSES.includes(existingOrder.status)) {
+      throw new HttpError(409, 'O endereço só pode ser alterado enquanto o pedido não foi enviado')
+    }
+
+    const changesStatus = data.status !== undefined && data.status !== existingOrder.status
+
+    if (changesStatus && !STATUS_TRANSITIONS[existingOrder.status].includes(data.status as OrderStatus)) {
+      throw new HttpError(409, `Transição de status inválida: ${existingOrder.status} → ${data.status}`)
+    }
+
+    // O status atual entra no filtro: se outra requisição mudou o pedido
+    // enquanto esta rodava, nada é atualizado (evita corrida e estoque
+    // devolvido em dobro).
+    const updated = await tx.order.updateMany({
+      where: { id, status: existingOrder.status },
+      data: {
+        ...(changesStatus ? { status: data.status } : {}),
+        ...(data.shippingAddress ? { shippingAddress: data.shippingAddress as Prisma.InputJsonObject } : {}),
       },
-      items: {
-        include: {
-          product: {
-            include: {
-              category: true,
-            },
-          },
-        },
-      },
-    },
+    })
+
+    if (updated.count === 0) {
+      throw new HttpError(409, 'O pedido foi alterado por outra requisição. Tente novamente')
+    }
+
+    if (changesStatus && data.status === 'CANCELLED') {
+      await restoreStock(tx, id)
+    }
   })
 
-  return updatedOrder
+  return prisma.order.findUniqueOrThrow({ where: { id }, include: orderInclude })
 }
 
 export async function cancelOrder(id: number, requestingUserId: number, isAdmin: boolean) {
-  // Verificar se pedido existe
-  const existingOrder = await prisma.order.findUnique({
-    where: { id },
-  })
-
-  if (!existingOrder) {
-    throw new Error('Pedido não encontrado')
-  }
-
-  // Verificar se o usuário pode cancelar o pedido
-  if (!isAdmin && existingOrder.userId !== requestingUserId) {
-    throw new Error('Você não tem permissão para cancelar este pedido')
-  }
-
-  // Verificar se pedido já foi cancelado
-  if (existingOrder.status === 'CANCELLED') {
-    throw new Error('Pedido já está cancelado')
-  }
-
-  // Verificar se pedido já foi entregue
-  if (existingOrder.status === 'DELIVERED') {
-    throw new Error('Não é possível cancelar um pedido já entregue')
-  }
-
-  // Atualizar status para CANCELLED (sem reversão de estoque)
-  const cancelledOrder = await prisma.order.update({
-    where: { id },
-    data: { status: 'CANCELLED' },
-    include: {
-      user: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-        },
+  await prisma.$transaction(async (tx) => {
+    // A mudança de status é a própria trava: só uma chamada consegue passar de
+    // PENDING/PAID para CANCELLED, então o estoque nunca é devolvido duas vezes.
+    const canceled = await tx.order.updateMany({
+      where: {
+        id,
+        ...(isAdmin ? {} : { userId: requestingUserId }),
+        status: { in: CANCELABLE_STATUSES },
       },
-      items: {
-        include: {
-          product: {
-            include: {
-              category: true,
-            },
-          },
-        },
-      },
-    },
-  })
+      data: { status: 'CANCELLED' },
+    })
 
-  return cancelledOrder
+    if (canceled.count === 0) {
+      const existing = await tx.order.findFirst({
+        where: isAdmin ? { id } : { id, userId: requestingUserId },
+        select: { status: true },
+      })
+
+      if (!existing) {
+        throw new HttpError(404, 'Pedido não encontrado')
+      }
+
+      throw new HttpError(
+        409,
+        existing.status === 'CANCELLED' ? 'Pedido já está cancelado' : `Pedido com status ${existing.status} não pode ser cancelado`
+      )
+    }
+
+    await restoreStock(tx, id)
+  })
 }

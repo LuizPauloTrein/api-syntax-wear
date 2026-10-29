@@ -1,6 +1,13 @@
 import { AuthRequest, RegisterRequest } from "../types";
 import { prisma } from "../utils/prisma";
 import bcrypt from "bcrypt";
+import { HttpError } from "../utils/http-error";
+
+// Hash usado quando o e-mail não existe: o login gasta o mesmo tempo de bcrypt
+// nos dois casos, então o tempo de resposta não revela quais e-mails existem.
+const DUMMY_HASH = bcrypt.hashSync("senha-inexistente", 10);
+
+const EMAIL_OR_CPF_TAKEN = "Não foi possível concluir o cadastro: e-mail ou CPF já cadastrado.";
 
 export const registerUser = async (payload: RegisterRequest) => {
 
@@ -9,7 +16,7 @@ export const registerUser = async (payload: RegisterRequest) => {
 	});
 
 	if (existingUser) {
-		throw new Error("Email já cadastrado.");
+		throw new HttpError(409, EMAIL_OR_CPF_TAKEN);
 	}
 
     const hashedPassword = await bcrypt.hash(payload.password, 10);
@@ -46,14 +53,11 @@ export const loginUser = async (data: AuthRequest) => {
         where: { email: data.email },
     });
 
-    if(!user) {
-        throw new Error("Usuário não encontrado.");
-    }
+    const isValidPassword = await bcrypt.compare(data.password, user?.password ?? DUMMY_HASH);
 
-    const isValidPassword = await bcrypt.compare(data.password, user.password);
-
-    if(!isValidPassword) {
-        throw new Error("Senha inválida.");
+    // Mesma mensagem e mesmo status para e-mail inexistente e senha errada.
+    if(!user || !isValidPassword) {
+        throw new HttpError(401, "Email ou senha inválidos.");
     }
 
     // Remover password antes de retornar

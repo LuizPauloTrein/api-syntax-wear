@@ -18,13 +18,13 @@ export default async function orderRoutes(fastify: FastifyInstance) {
           type: 'object',
           properties: {
             page: { type: 'number', description: 'Número da página (padrão: 1)' },
-            limit: { type: 'number', description: 'Limite de itens por página (padrão: 10)' },
+            limit: { type: 'number', maximum: 100, description: 'Limite de itens por página (padrão: 10, máximo: 100)' },
             status: {
               type: 'string',
               enum: ['PENDING', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
               description: 'Filtrar por status do pedido',
             },
-            userId: { type: 'number', description: 'Filtrar por ID do usuário' },
+            userId: { type: 'number', description: 'Filtrar por ID do usuário (somente administradores; clientes veem só os próprios pedidos)' },
             startDate: { type: 'string', format: 'date-time', description: 'Data inicial (ISO 8601)' },
             endDate: { type: 'string', format: 'date-time', description: 'Data final (ISO 8601)' },
           },
@@ -42,7 +42,7 @@ export default async function orderRoutes(fastify: FastifyInstance) {
                     userId: { type: 'number', nullable: true },
                     total: { type: 'number' },
                     status: { type: 'string' },
-                    shippingAddress: { type: 'object' },
+                    shippingAddress: { type: 'object', additionalProperties: true },
                     paymentMethod: { type: 'string' },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
@@ -124,7 +124,7 @@ export default async function orderRoutes(fastify: FastifyInstance) {
               userId: { type: 'number', nullable: true },
               total: { type: 'number' },
               status: { type: 'string' },
-              shippingAddress: { type: 'object' },
+              shippingAddress: { type: 'object', additionalProperties: true },
               paymentMethod: { type: 'string' },
               createdAt: { type: 'string', format: 'date-time' },
               updatedAt: { type: 'string', format: 'date-time' },
@@ -197,22 +197,22 @@ export default async function orderRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Orders'],
-        description: 'Criar novo pedido com validação de estoque e cálculo automático de total',
+        description: 'Criar pedido para o usuário autenticado. O preço vem sempre do banco, o estoque é baixado de forma atômica e o pedido nasce PENDING',
         security: [{ bearerAuth: [] }],
         body: {
           type: 'object',
           required: ['items', 'shippingAddress', 'paymentMethod'],
           properties: {
-            userId: { type: 'number', description: 'ID do usuário (opcional para guest checkout)' },
             items: {
               type: 'array',
               minItems: 1,
+              maxItems: 50,
               items: {
                 type: 'object',
                 required: ['productId', 'quantity'],
                 properties: {
                   productId: { type: 'number', description: 'ID do produto' },
-                  quantity: { type: 'number', description: 'Quantidade' },
+                  quantity: { type: 'number', minimum: 1, maximum: 99, description: 'Quantidade (1 a 99)' },
                   size: { type: 'string', description: 'Tamanho (obrigatório se produto tiver sizes)' },
                 },
               },
@@ -231,7 +231,7 @@ export default async function orderRoutes(fastify: FastifyInstance) {
                 country: { type: 'string', default: 'BR', description: 'País (padrão: BR)' },
               },
             },
-            paymentMethod: { type: 'string', description: 'Método de pagamento (ex: credit_card, pix, boleto)' },
+            paymentMethod: { type: 'string', enum: ['credit_card', 'pix', 'boleto'], description: 'Método de pagamento' },
           },
         },
         response: {
@@ -266,7 +266,7 @@ export default async function orderRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Orders'],
-        description: 'Atualizar status ou endereço de entrega do pedido (não permite alterar items)',
+        description: 'Atualizar o endereço (enquanto o pedido não foi enviado) ou, somente ADMIN, o status seguindo as transições permitidas. Não altera os itens',
         security: [{ bearerAuth: [] }],
         params: {
           type: 'object',
@@ -306,13 +306,25 @@ export default async function orderRoutes(fastify: FastifyInstance) {
               userId: { type: 'number', nullable: true },
               total: { type: 'number' },
               status: { type: 'string' },
-              shippingAddress: { type: 'object' },
+              shippingAddress: { type: 'object', additionalProperties: true },
               paymentMethod: { type: 'string' },
               createdAt: { type: 'string', format: 'date-time' },
               updatedAt: { type: 'string', format: 'date-time' },
             },
           },
           404: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+            },
+          },
+          403: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+            },
+          },
+          409: {
             type: 'object',
             properties: {
               message: { type: 'string' },
@@ -330,7 +342,7 @@ export default async function orderRoutes(fastify: FastifyInstance) {
     {
       schema: {
         tags: ['Orders'],
-        description: 'Cancelar pedido (altera status para CANCELLED sem reversão de estoque)',
+        description: 'Cancelar pedido PENDING ou PAID (status CANCELLED) e devolver o estoque dos itens',
         security: [{ bearerAuth: [] }],
         params: {
           type: 'object',
@@ -353,6 +365,18 @@ export default async function orderRoutes(fastify: FastifyInstance) {
             },
           },
           404: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+            },
+          },
+          403: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+            },
+          },
+          409: {
             type: 'object',
             properties: {
               message: { type: 'string' },

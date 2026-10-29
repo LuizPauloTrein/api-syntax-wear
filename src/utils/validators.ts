@@ -79,22 +79,21 @@ export const deleteProductSchema = z.object({
 // Order validation schemas
 export const orderFiltersSchema = z.object({
 	page: z.coerce.number().int().min(1, "Página deve ser no mínimo 1").optional(),
-	limit: z.coerce.number().int().min(1, "Limite deve ser no mínimo 1").optional(),
+	limit: z.coerce.number().int().min(1, "Limite deve ser no mínimo 1").max(100, "Limite máximo é 100").optional(),
 	status: z.enum(["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"]).optional(),
 	userId: z.coerce.number().int().optional(),
-	startDate: z.string().optional(),
-	endDate: z.string().optional(),
+	startDate: z.coerce.date("Data inicial inválida").optional(),
+	endDate: z.coerce.date("Data final inválida").optional(),
 });
 
 export const createOrderItemSchema = z.object({
 	productId: z.number().int().min(1, "ID do produto inválido"),
-	quantity: z.number().int().min(1, "Quantidade deve ser no mínimo 1"),
+	quantity: z.number().int().min(1, "Quantidade deve ser no mínimo 1").max(99, "Quantidade máxima por item é 99"),
 	size: z.string().optional(),
 });
 
 export const createOrderSchema = z.object({
-	userId: z.number().int().optional(),
-	items: z.array(createOrderItemSchema).min(1, "Pedido deve ter pelo menos um item"),
+	items: z.array(createOrderItemSchema).min(1, "Pedido deve ter pelo menos um item").max(50, "Máximo de 50 itens por pedido"),
 	shippingAddress: z.object({
 		cep: z.string().regex(/^\d{8}$/, "CEP deve ter 8 dígitos"),
 		street: z.string().min(1, "Rua é obrigatória"),
@@ -105,7 +104,7 @@ export const createOrderSchema = z.object({
 		state: z.string().length(2, "Estado deve ter 2 caracteres"),
 		country: z.string().default("BR"),
 	}),
-	paymentMethod: z.string().min(1, "Método de pagamento é obrigatório"),
+	paymentMethod: z.enum(["credit_card", "pix", "boleto"], "Método de pagamento inválido"),
 });
 
 export const updateOrderSchema = z.object({

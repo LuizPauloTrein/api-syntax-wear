@@ -1,5 +1,6 @@
 import { prisma } from "../utils/prisma";
 import { CreateProduct, ProductFilters, UpdateProduct } from "../types";
+import { HttpError } from "../utils/http-error";
 
 export const getProducts = async (filter: ProductFilters) => {
 	const { minPrice, maxPrice, search, categoryId, sortBy, sortOrder, page = 1, limit = 10 } = filter;
@@ -84,7 +85,7 @@ export const getProductById = async (id: number) => {
 	});
 
 	if (!product) {
-		throw new Error("Produto não encontrado");
+		throw new HttpError(404, "Produto não encontrado");
 	}
 
 	return product;
@@ -96,7 +97,7 @@ export const createProduct = async (data: CreateProduct) => {
 	});
 
 	if (existingProduct) {
-		throw new Error("Slug já existe. Escolha outro nome para o produto.");
+		throw new HttpError(409, "Slug já existe. Escolha outro nome para o produto.");
 	}
 
 	const newProduct = await prisma.product.create({ data });
@@ -108,7 +109,7 @@ export const updateProduct = async (id: number, data: UpdateProduct) => {
 	});
 
 	if (!existingProduct) {
-		throw new Error("Produto não encontrado");
+		throw new HttpError(404, "Produto não encontrado");
 	}
 
 	if (data.slug) {
@@ -117,7 +118,7 @@ export const updateProduct = async (id: number, data: UpdateProduct) => {
 		});
 
 		if (slugExists && slugExists.id !== id) {
-			throw new Error("Slug já existe. Escolha outro nome para o produto.");
+			throw new HttpError(409, "Slug já existe. Escolha outro nome para o produto.");
 		}
 	}
 
@@ -135,7 +136,7 @@ export const deleteProduct = async (id: number) => {
 	});
 
 	if(!existingProduct) {
-		throw new Error("Produto não encontrado");
+		throw new HttpError(404, "Produto não encontrado");
 	}
 
 	await prisma.product.update({

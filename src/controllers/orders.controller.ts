@@ -29,7 +29,9 @@ export async function getOrder(request: FastifyRequest<{ Params: { id: string } 
 
 export async function createNewOrder(request: FastifyRequest, reply: FastifyReply) {
   const data = createOrderSchema.parse(request.body as CreateOrder)
-  const order = await createOrder(data)
+
+  // O dono do pedido é sempre quem está autenticado.
+  const order = await createOrder((request.user as any).userId, data)
   reply.status(201).send({
     message: 'Pedido criado com sucesso',
     orderId: order.id,
