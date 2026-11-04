@@ -12,6 +12,8 @@ export default defineConfig({
         "src/controllers/products.controller.ts",
         "src/services/categories.service.ts",
         "src/controllers/categories.controller.ts",
+        "src/services/orders.service.ts",
+        "src/controllers/orders.controller.ts",
         "src/utils/validators.ts",
         "src/utils/slug.ts",
       ],
