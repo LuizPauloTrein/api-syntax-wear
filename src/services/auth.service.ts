@@ -19,7 +19,7 @@ export const registerUser = async (payload: RegisterRequest) => {
 		throw new HttpError(409, EMAIL_OR_CPF_TAKEN);
 	}
 
-    const hashedPassword = await bcrypt.hash(payload.password, 10);
+  const hashedPassword = await bcrypt.hash(payload.password, 10);
 
 	const newUser = await prisma.user.create({
 		data: {
@@ -45,23 +45,25 @@ export const registerUser = async (payload: RegisterRequest) => {
 		},
 	});
 
-    return newUser;
+  return newUser;
 };
 
 export const loginUser = async (data: AuthRequest) => {
-    const user = await prisma.user.findUnique({
-        where: { email: data.email },
-    });
+  const user = await prisma.user.findUnique({
+    where: { email: data.email },
+  });
 
-    const isValidPassword = await bcrypt.compare(data.password, user?.password ?? DUMMY_HASH);
+  const isValidPassword = await bcrypt.compare(data.password, user?.password ?? DUMMY_HASH);
 
-    // Mesma mensagem e mesmo status para e-mail inexistente e senha errada.
-    if(!user || !isValidPassword) {
-        throw new HttpError(401, "Email ou senha inválidos.");
-    }
+  // Mesma mensagem e mesmo status para e-mail inexistente e senha errada.
+  if(!user || !isValidPassword) {
+    throw new HttpError(401, "Email ou senha inválidos.");
+  }
 
-    // Remover password antes de retornar
-    const { password, ...userWithoutPassword } = user;
+  // Remover password antes de retornar
+  const { password, ...userWithoutPassword } = user;
 
-    return userWithoutPassword;
+  return userWithoutPassword;
 };
+
+//profile update

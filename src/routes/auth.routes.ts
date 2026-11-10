@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
-import { register, login } from "../controllers/auth.controller";
+import { register, login, profile } from "../controllers/auth.controller";
+import { authenticate } from "../middlewares/auth.middleware";
 
 export default async function authRoutes(fastify: FastifyInstance) {
 	fastify.post(
@@ -44,4 +45,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
 		},
 		login
 	);
+
+	fastify.get("/profile", {
+		preHandler: [authenticate],
+		schema: {
+			tags: ["Auth"],
+			description: "Retorna o perfil do usuario autenticado",
+			security: [{bearerAuth: []}],
+		},
+	}, profile)
 }
