@@ -4,13 +4,24 @@ import { prisma } from "../utils/prisma";
 import bcrypt from "bcrypt";
 import { OAuth2Client } from "google-auth-library";
 
-export const registerUser = async (payload: RegisterRequest) => {
-  const existingUser = await prisma.user.findUnique({
-    where: { email: payload.email },
+export const registerUser = async (
+  payload: RegisterRequest,
+  reply: FastifyReply
+) => {
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      OR: [{ email: payload.email }, { cpf: payload.cpf }],
+    },
   });
 
   if (existingUser) {
-    throw new Error("Email já cadastrado.");
+    if (existingUser.email === payload.email) {
+      return reply.status(409).send({ message: "E-mail já cadastrado" });
+    }
+
+    if (existingUser.cpf === payload.cpf) {
+      return reply.status(409).send({ message: "CPF já cadastrado" });
+    }
   }
 
   const hashedPassword = await bcrypt.hash(payload.password, 10);
@@ -22,7 +33,7 @@ export const registerUser = async (payload: RegisterRequest) => {
       email: payload.email,
       password: hashedPassword,
       cpf: payload.cpf,
-      birthDate: payload.dateOfBirth || undefined,
+      birthDate: payload.birthDate ? new Date(payload.birthDate) : undefined,
       phone: payload.phone,
       role: "USER",
     },
@@ -79,9 +90,9 @@ export const loginWithGoogle = async (
   const payload = ticket.getPayload();
 
   if (!payload || !payload.email) {
-	// 401 Unauthorized
-	reply.status(401).send({ message: "Token do Google inválido" });
-	return;
+    // 401 Unauthorized
+    reply.status(401).send({ message: "Token do Google inválido" });
+    return;
   }
 
   const { email, given_name, family_name } = payload;
@@ -89,15 +100,15 @@ export const loginWithGoogle = async (
   let user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
-	user = await prisma.user.create({
-		data: {
-		firstName: given_name || "",
-		lastName: family_name || "",
-		email,
-		password: "", // Senha vazia, pois o login é via Google
-		role: "USER",
-    },
-	});
+    user = await prisma.user.create({
+      data: {
+        firstName: given_name || "",
+        lastName: family_name || "",
+        email,
+        password: "", // Senha vazia, pois o login é via Google
+        role: "USER",
+      },
+    });
   }
 
   // Remover password antes de retornar

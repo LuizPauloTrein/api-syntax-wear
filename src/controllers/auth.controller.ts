@@ -11,13 +11,20 @@ export const register = async (
 
   const validation = registerSchema.parse(request.body as RegisterRequest);
 
-  const user = await registerUser(validation);
+  const user = await registerUser(validation, reply);
 
   const token = request.server.jwt.sign({ userId: user.id });
 
+  reply.setCookie("syntaxwear.token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24,
+  });
+
   reply.status(201).send({
-    user,
-    token,
+    user
   });
 };
 
