@@ -1,7 +1,7 @@
 // Require the framework and instantiate it
 
-// ESM
-import Fastify, { FastifyError } from "fastify";
+// ESM s
+import Fastify, { FastifyBaseLogger, FastifyInstance, FastifyTypeProvider, RawServerDefault } from "fastify";
 import "dotenv/config";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
@@ -11,43 +11,13 @@ import orderRoutes from "./routes/orders.routes";
 import swagger from "@fastify/swagger";
 import jwt from "@fastify/jwt";
 import authRoutes from "./routes/auth.routes";
-import z, { ZodError } from "zod";
 import { errorHandler } from "./middlewares/error.middleware";
+import cookie from "@fastify/cookie";
+import { IncomingMessage, ServerResponse } from "http";
 
 const PORT = parseInt(process.env.PORT ?? "3000");
-const isProduction = process.env.NODE_ENV === "production";
 
-// URL pública da API (mostrada na documentação). No Render, a variável
-// RENDER_EXTERNAL_URL já vem preenchida; localmente cai no localhost.
-const publicUrl = process.env.RENDER_EXTERNAL_URL || process.env.API_URL;
-
-// Monta e configura a aplicação, sem abrir a porta (isso é feito em server.ts).
-export const buildApp = async () => {
-  // JWT: a API não sobe com segredo ausente ou curto (um segredo fraco permite
-  // forjar tokens, inclusive de ADMIN). Gere um com:
-  //   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-  const JWT_SECRET = process.env.JWT_SECRET;
-
-  if (!JWT_SECRET || JWT_SECRET.length < 32) {
-    throw new Error(
-      "JWT_SECRET ausente ou curto demais: defina um segredo aleatório com pelo menos 32 caracteres no .env",
-    );
-  }
-
-  // CORS: só as origens listadas em CORS_ORIGINS (separadas por vírgula).
-  // Fora de produção, sem a variável, libera apenas o front local.
-  const corsOrigins = (process.env.CORS_ORIGINS ?? "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
-  const allowedOrigins =
-    corsOrigins.length > 0
-      ? corsOrigins
-      : isProduction
-        ? false
-        : ["http://localhost:5173", "http://localhost:3000"];
-
+export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
     logger: {
       level: process.env.LOG_LEVEL || "info",
@@ -68,14 +38,19 @@ export const buildApp = async () => {
     },
   });
 
+  // permite manipular cookies nas requisições
+  fastify.register(cookie);
+
   fastify.register(jwt, {
-    secret: JWT_SECRET,
-    // Tokens expiram (padrão: 1 hora). Aceita "15m", "1h", "7d" etc.
-    sign: { expiresIn: process.env.JWT_EXPIRES_IN || "1h" },
+    secret: process.env.JWT_SECRET!,
+    cookie: {
+      cookieName: "syntaxwear.token",
+      signed: false, // não estamos usando cookies assinados
+    },
   });
 
   fastify.register(cors, {
-    origin: allowedOrigins,
+    origin: true,
     credentials: true,
   });
 
@@ -92,12 +67,10 @@ export const buildApp = async () => {
         version: "1.0.0",
       },
       servers: [
-        publicUrl
-          ? { url: publicUrl, description: "Servidor de produção" }
-          : {
-              url: `http://localhost:${PORT}`,
-              description: "Servidor de desenvolvimento",
-            },
+        {
+          url: `http://localhost:${PORT}`,
+          description: "Servidor de desenvolvimento",
+        },
       ],
       components: {
         securitySchemes: {
@@ -112,14 +85,11 @@ export const buildApp = async () => {
     },
   });
 
-  fastify.register(async (instance) => {
-    const { default: scalar } = await import("@scalar/fastify-api-reference");
-    await instance.register(scalar, {
-      routePrefix: "/api-docs",
-      configuration: {
-        theme: "default",
-      },
-    });
+  fastify.register(scalar, {
+    routePrefix: "/api-docs",
+    configuration: {
+      theme: "default",
+    },
   });
 
   fastify.register(productRoutes, { prefix: "/products" });
@@ -145,5 +115,11 @@ export const buildApp = async () => {
 
   fastify.setErrorHandler(errorHandler);
 
+  await fastify.ready();
+
   return fastify;
-};
+}
+function scalar(instance: FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse<IncomingMessage>, FastifyBaseLogger, FastifyTypeProvider>, opts: { routePrefix: string; configuration: { theme: string; }; }, done: (err?: Error | undefined) => void): void {
+  throw new Error("Function not implemented.");
+}
+

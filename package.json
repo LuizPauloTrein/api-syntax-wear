@@ -28,6 +28,7 @@
   },
   "homepage": "https://github.com/Dev-em-Dobro/syntax-wear-api#readme",
   "dependencies": {
+    "@fastify/cookie": "^11.1.5",
     "@fastify/cors": "^11.1.0",
     "@fastify/csrf-protection": "^7.1.0",
     "@fastify/helmet": "^13.0.2",
