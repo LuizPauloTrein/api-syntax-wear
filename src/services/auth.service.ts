@@ -82,14 +82,29 @@ export const loginWithGoogle = async (
   credential: string,
   reply: FastifyReply
 ) => {
-  const ticket = await googleClient.verifyIdToken({
-    idToken: credential,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    reply
+      .status(500)
+      .send({ message: "Login com Google não configurado no servidor." });
+    return;
+  }
 
-  const payload = ticket.getPayload();
+  let payload;
 
-  if (!payload || !payload.email) {
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    payload = ticket.getPayload();
+  } catch {
+    // token expirado, malformado ou emitido para outro client ID
+    reply.status(401).send({ message: "Token do Google inválido" });
+    return;
+  }
+
+  if (!payload || !payload.email || !payload.email_verified) {
     // 401 Unauthorized
     reply.status(401).send({ message: "Token do Google inválido" });
     return;
