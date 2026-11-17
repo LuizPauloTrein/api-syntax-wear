@@ -70,8 +70,8 @@ export interface OrderFilters {
     limit?: number;
     status?: 'PENDING' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
     userId?: number;
-    startDate?: string;
-    endDate?: string;
+    startDate?: Date | string;
+    endDate?: Date | string;
 }
 
 export interface ShippingAddress {

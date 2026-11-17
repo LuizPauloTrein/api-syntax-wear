@@ -193,7 +193,7 @@ export async function createOrder(userId: number, data: CreateOrder) {
         userId,
         total,
         status: 'PENDING',
-        shippingAddress: data.shippingAddress as Prisma.InputJsonObject,
+        shippingAddress: data.shippingAddress as unknown as Prisma.InputJsonObject,
         paymentMethod: data.paymentMethod,
         items: { create: orderItems },
       },
@@ -251,7 +251,7 @@ export async function updateOrder(id: number, data: UpdateOrder, requestingUserI
       where: { id, status: existingOrder.status },
       data: {
         ...(changesStatus ? { status: data.status } : {}),
-        ...(data.shippingAddress ? { shippingAddress: data.shippingAddress as Prisma.InputJsonObject } : {}),
+        ...(data.shippingAddress ? { shippingAddress: data.shippingAddress as unknown as Prisma.InputJsonObject } : {}),
       },
     })
 
