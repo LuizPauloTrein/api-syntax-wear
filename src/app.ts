@@ -1,7 +1,7 @@
 // Require the framework and instantiate it
 
 // ESM s
-import Fastify, { FastifyBaseLogger, FastifyInstance, FastifyTypeProvider, RawServerDefault } from "fastify";
+import Fastify, { FastifyInstance } from "fastify";
 import "dotenv/config";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
@@ -13,7 +13,6 @@ import jwt from "@fastify/jwt";
 import authRoutes from "./routes/auth.routes";
 import { errorHandler } from "./middlewares/error.middleware";
 import cookie from "@fastify/cookie";
-import { IncomingMessage, ServerResponse } from "http";
 
 const PORT = parseInt(process.env.PORT ?? "3000");
 
@@ -85,6 +84,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   });
 
+  // O pacote do Scalar é ESM-only e este projeto é CommonJS, por isso o import dinâmico
+  const { default: scalar } = await import("@scalar/fastify-api-reference");
+
   fastify.register(scalar, {
     routePrefix: "/api-docs",
     configuration: {
@@ -119,7 +121,3 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   return fastify;
 }
-function scalar(instance: FastifyInstance<RawServerDefault, IncomingMessage, ServerResponse<IncomingMessage>, FastifyBaseLogger, FastifyTypeProvider>, opts: { routePrefix: string; configuration: { theme: string; }; }, done: (err?: Error | undefined) => void): void {
-  throw new Error("Function not implemented.");
-}
-
